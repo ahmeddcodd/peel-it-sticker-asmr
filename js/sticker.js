@@ -36,6 +36,12 @@ PeelIt.Sticker = (function () {
 
   function roundRectPath(ctx, x, y, w, h, r) {
     ctx.beginPath();
+    appendRoundRect(ctx, x, y, w, h, r);
+  }
+
+  // Same rounded-rect subpath but WITHOUT beginPath(), so several can be
+  // appended into one path (e.g. an outline that traces multiple parts).
+  function appendRoundRect(ctx, x, y, w, h, r) {
     ctx.moveTo(x + r, y);
     ctx.arcTo(x + w, y, x + w, y + h, r);
     ctx.arcTo(x + w, y + h, x, y + h, r);
@@ -98,10 +104,15 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['boba-pearls'] = {
+    // The four pearls themselves (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-45 * s, -14 * s, 90 * s, 28 * s);
+      [-32, -11, 11, 32].forEach(function (x, i) {
+        var cy = (i % 2 === 0 ? -4 : 6) * s;
+        ctx.moveTo(x * s + 9 * s, cy);
+        ctx.arc(x * s, cy, 9 * s, 0, Math.PI * 2);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -175,10 +186,17 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['boba-face'] = {
+    // Traces the actual face features (two eyes + a smile) as one path so the
+    // dashed placeholder reads as a face, not a generic box.
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-40 * s, -20 * s, 80 * s, 40 * s);
+      [-20, 20].forEach(function (x) {
+        ctx.moveTo((x - 10) * s, 2 * s);
+        ctx.quadraticCurveTo(x * s, -10 * s, (x + 10) * s, 2 * s);
+      });
+      ctx.moveTo(8 * s, 8 * s);
+      ctx.arc(0, 8 * s, 8 * s, 0.15 * Math.PI, 0.85 * Math.PI);
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -230,10 +248,16 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['cat-ears'] = {
+    // Two triangular ears traced as one path (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-70 * s, -55 * s, 140 * s, 45 * s);
+      [-1, 1].forEach(function (side) {
+        var bx = side * 44 * s;
+        ctx.moveTo(bx - 26 * s * side, -8 * s);
+        ctx.quadraticCurveTo(bx - 6 * s * side, -60 * s, bx + 22 * s * side, -10 * s);
+        ctx.closePath();
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -260,10 +284,14 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['cat-eyes'] = {
+    // Two closed-eye curves (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-40 * s, -10 * s, 80 * s, 20 * s);
+      [-22, 22].forEach(function (x) {
+        ctx.moveTo((x - 13) * s, 4 * s);
+        ctx.quadraticCurveTo(x * s, -12 * s, (x + 13) * s, 4 * s);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -280,10 +308,18 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['cat-nose-mouth'] = {
+    // Triangular nose + the two mouth curves (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-20 * s, -8 * s, 40 * s, 30 * s);
+      ctx.moveTo(-6 * s, -2 * s);
+      ctx.lineTo(6 * s, -2 * s);
+      ctx.lineTo(0, 6 * s);
+      ctx.closePath();
+      ctx.moveTo(0, 6 * s);
+      ctx.quadraticCurveTo(-10 * s, 10 * s, -14 * s, 4 * s);
+      ctx.moveTo(0, 6 * s);
+      ctx.quadraticCurveTo(10 * s, 10 * s, 14 * s, 4 * s);
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -309,10 +345,16 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['cat-whiskers'] = {
+    // The six whisker lines themselves (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-70 * s, -12 * s, 140 * s, 24 * s);
+      [-1, 1].forEach(function (side) {
+        [-8, 0, 8].forEach(function (dy) {
+          ctx.moveTo(side * 20 * s, dy * s);
+          ctx.lineTo(side * 62 * s, dy * 0.6 * s);
+        });
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -331,10 +373,14 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['cat-blush'] = {
+    // The two blush ovals (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-60 * s, -12 * s, 120 * s, 24 * s);
+      [-40, 40].forEach(function (x) {
+        ctx.moveTo((x + 14) * s, 0);
+        ctx.ellipse(x * s, 0, 14 * s, 9 * s, 0, 0, Math.PI * 2);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -408,10 +454,17 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['cake-frosting'] = {
+    // The scalloped drip silhouette (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-60 * s, -18 * s, 120 * s, 36 * s);
+      ctx.moveTo(-60 * s, -10 * s);
+      for (var i = -60; i < 60; i += 20) {
+        ctx.quadraticCurveTo((i + 10) * s, 14 * s, (i + 20) * s, -10 * s);
+      }
+      ctx.lineTo(60 * s, -18 * s);
+      ctx.lineTo(-60 * s, -18 * s);
+      ctx.closePath();
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -432,10 +485,26 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['cake-sprinkles'] = {
+    // Each individual sprinkle as a tiny capsule at its own position/angle
+    // (matches draw()), so the placeholder reads as scattered sprinkles.
     outline: function (ctx, size) {
       var s = size / 200;
+      var pts = [[-38, -4], [-20, 6], [-2, -6], [16, 4], [34, -4], [6, 8], [-28, 8]];
       ctx.beginPath();
-      ctx.rect(-50 * s, -14 * s, 100 * s, 28 * s);
+      pts.forEach(function (p, i) {
+        var ang = ((i * 37) % 180) * Math.PI / 180;
+        var cx = p[0] * s, cy = p[1] * s;
+        var hw = 5 * s, hh = 2 * s, r = 2 * s;
+        var cos = Math.cos(ang), sin = Math.sin(ang);
+        // four corners of the capsule, rotated about (cx, cy)
+        function pt(dx, dy) { return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos]; }
+        var a = pt(-hw + r, -hh), b = pt(hw - r, -hh), c = pt(hw, hh), d = pt(-hw, hh);
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.lineTo(c[0], c[1]);
+        ctx.lineTo(d[0], d[1]);
+        ctx.closePath();
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -656,10 +725,17 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['shoe-laces'] = {
+    // The three crossing lace X's (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-30 * s, -38 * s, 60 * s, 30 * s);
+      for (var i = 0; i < 3; i++) {
+        var y = -32 * s + i * 12 * s;
+        ctx.moveTo(-25 * s, y);
+        ctx.lineTo(20 * s, y + 10 * s);
+        ctx.moveTo(20 * s, y);
+        ctx.lineTo(-25 * s, y + 10 * s);
+      }
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -679,10 +755,14 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['shoe-swoosh'] = {
+    // The swoosh silhouette (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-40 * s, -20 * s, 100 * s, 40 * s);
+      ctx.moveTo(-40 * s, 10 * s);
+      ctx.quadraticCurveTo(10 * s, -20 * s, 55 * s, -8 * s);
+      ctx.quadraticCurveTo(10 * s, -4 * s, -30 * s, 18 * s);
+      ctx.closePath();
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -929,10 +1009,12 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['dpad'] = {
+    // The plus/cross of the d-pad (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-20 * s, -20 * s, 40 * s, 40 * s);
+      appendRoundRect(ctx, -8 * s, -20 * s, 16 * s, 40 * s, 4 * s);
+      appendRoundRect(ctx, -20 * s, -8 * s, 40 * s, 16 * s, 4 * s);
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -946,10 +1028,14 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['buttons'] = {
+    // The four face buttons in a diamond (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-18 * s, -18 * s, 36 * s, 36 * s);
+      [[0, -14], [14, 0], [0, 14], [-14, 0]].forEach(function (p) {
+        ctx.moveTo(p[0] * s + 9 * s, p[1] * s);
+        ctx.arc(p[0] * s, p[1] * s, 9 * s, 0, Math.PI * 2);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1099,10 +1185,14 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['syrup-drizzle'] = {
+    // The five drizzle strands (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-40 * s, -10 * s, 80 * s, 30 * s);
+      for (var i = -30; i <= 30; i += 15) {
+        ctx.moveTo(i * s, -10 * s);
+        ctx.quadraticCurveTo((i + 8) * s, 4 * s, i * s, 18 * s);
+      }
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1204,10 +1294,16 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['planet-spots'] = {
+    // The five surface spots themselves (matches draw()), not one big circle -
+    // that circle sat exactly under the placed planet body and was invisible,
+    // leaving the player to guess. The spot ovals read as the real markings.
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.arc(0, 0, 55 * s, 0, Math.PI * 2);
+      [[-20, -10, 10], [15, 10, 8], [0, -25, 6], [25, -15, 7], [-10, 20, 9]].forEach(function (c) {
+        ctx.moveTo((c[0] + c[2]) * s, c[1] * s);
+        ctx.ellipse(c[0] * s, c[1] * s, c[2] * s, c[2] * 0.7 * s, 0, 0, Math.PI * 2);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1238,10 +1334,16 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['comet'] = {
+    // The tail triangle + the head circle (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-60 * s, -20 * s, 100 * s, 40 * s);
+      ctx.moveTo(-60 * s, 0);
+      ctx.lineTo(30 * s, -9 * s);
+      ctx.lineTo(30 * s, 9 * s);
+      ctx.closePath();
+      ctx.moveTo(32 * s + 11 * s, 0);
+      ctx.arc(32 * s, 0, 11 * s, 0, Math.PI * 2);
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1267,10 +1369,28 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['stars-sparkle'] = {
+    // The six four-point sparkle stars themselves (matches draw()), so the
+    // placeholder reads as scattered sparkles, not a box.
     outline: function (ctx, size) {
       var s = size / 200;
+      var pts = [[-45, -20], [-10, -35], [30, -10], [45, 20], [-30, 25], [5, 10]];
       ctx.beginPath();
-      ctx.rect(-60 * s, -40 * s, 120 * s, 80 * s);
+      pts.forEach(function (p, i) {
+        var r = (i % 2 === 0 ? 6 : 4) * s;
+        var ox = p[0] * s, oy = p[1] * s, rot = i;
+        var cos = Math.cos(rot), sin = Math.sin(rot);
+        function pt(x, y) { return [ox + x * cos - y * sin, oy + x * sin + y * cos]; }
+        var first = true;
+        for (var k = 0; k < 4; k++) {
+          var a = (Math.PI / 2) * k;
+          var p1 = pt(Math.cos(a) * r, Math.sin(a) * r);
+          if (first) { ctx.moveTo(p1[0], p1[1]); first = false; } else ctx.lineTo(p1[0], p1[1]);
+          var a2 = a + Math.PI / 4;
+          var p2 = pt(Math.cos(a2) * r * 0.35, Math.sin(a2) * r * 0.35);
+          ctx.lineTo(p2[0], p2[1]);
+        }
+        ctx.closePath();
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1365,10 +1485,15 @@ PeelIt.Sticker = (function () {
   SHAPES['wing-lower-right'] = wingShape(false, false);
 
   SHAPES['wing-pattern'] = {
+    // The eight pattern dots themselves (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
+      var pts = [[-45, -25], [45, -25], [-55, 20], [55, 20], [-25, -45], [25, -45], [-30, 40], [30, 40]];
       ctx.beginPath();
-      ctx.rect(-90 * s, -70 * s, 180 * s, 140 * s);
+      pts.forEach(function (p) {
+        ctx.moveTo(p[0] * s + 6 * s, p[1] * s);
+        ctx.arc(p[0] * s, p[1] * s, 6 * s, 0, Math.PI * 2);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1429,10 +1554,14 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['seaweed'] = {
+    // The three seaweed fronds (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-20 * s, -60 * s, 40 * s, 80 * s);
+      [-12, 0, 12].forEach(function (x, i) {
+        ctx.moveTo(x * s, 20 * s);
+        ctx.quadraticCurveTo((x - 10) * s, -10 * s, (x + 6) * s, -40 * s - i * 4 * s);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1486,10 +1615,14 @@ PeelIt.Sticker = (function () {
   };
 
   SHAPES['bubbles'] = {
+    // The four bubbles themselves (matches draw()).
     outline: function (ctx, size) {
       var s = size / 200;
       ctx.beginPath();
-      ctx.rect(-20 * s, -50 * s, 40 * s, 100 * s);
+      [[0, 30, 10], [-8, 0, 6], [10, -25, 7], [2, -45, 4]].forEach(function (c) {
+        ctx.moveTo(c[0] * s + c[2] * s, c[1] * s);
+        ctx.arc(c[0] * s, c[1] * s, c[2] * s, 0, Math.PI * 2);
+      });
     },
     draw: function (ctx, size, color) {
       var s = size / 200;
@@ -1791,10 +1924,22 @@ PeelIt.Sticker = (function () {
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(rotRad);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // Soft light halo underneath the dashes, so the placeholder stays legible
+    // over both pale and darker/saturated level backgrounds. Traced solid
+    // (no dash) and slightly wider than the dashes it sits behind.
     shape.outline(ctx, size);
-    ctx.setLineDash([7, 7]);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = dimmed ? 'rgba(120,110,140,0.25)' : 'rgba(120,110,140,0.55)';
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = dimmed ? 'rgba(255,255,255,0.28)' : 'rgba(255,255,255,0.55)';
+    ctx.stroke();
+    // The dashed silhouette itself: bolder and higher-contrast than before so
+    // every placeholder - including thin pieces like the candle - clearly
+    // shows its true shape and reads as "the piece goes here".
+    shape.outline(ctx, size);
+    ctx.setLineDash([9, 7]);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = dimmed ? 'rgba(96,86,120,0.4)' : 'rgba(84,72,110,0.85)';
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.restore();

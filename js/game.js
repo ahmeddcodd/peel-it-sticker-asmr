@@ -37,6 +37,10 @@ PeelIt.Game = (function () {
   var TRAY_USABLE_FRAC = 0.94;
   var TRAY_SLOT_GAP = 18;
   var TRAY_MAX_PER_ROW = 3;
+  // Fraction of a tray cell a piece is grown to fill when its authored size
+  // is smaller than the cell, so tiny pieces (a 50px flame, a 60px light)
+  // still read clearly instead of rendering as a speck. See layoutTray().
+  var TRAY_TARGET_FILL = 0.8;
   var trayCellSize = 150; // drawn footprint budget per slot, set by layoutTray
 
   var canvas, ctx, frame;
@@ -317,9 +321,19 @@ PeelIt.Game = (function () {
 
       s.trayX = startX + col * slotW;
       s.trayY = TRAY_RECT.y + slotH * (row + 0.5);
-      // Shrink to fit the cell, but never magnify a small piece past its
-      // authored size (a 50px candle flame must stay 50px).
-      s.trayScale = Math.min(1, trayCellSize / s.size);
+      // Size the piece to its cell. Two bounds:
+      //  - fit:  shrink a big piece so it never exceeds the cell.
+      //  - grow: magnify a small piece UP toward TRAY_TARGET_FILL of the
+      //          cell so a tiny authored piece (e.g. a 50px candle flame)
+      //          reads clearly in the tray instead of rendering as a speck.
+      // We take the smaller of the two so a piece never overflows its cell,
+      // and clamp the lower end to 1 so a piece already large enough is left
+      // at (or shrunk toward) its authored size rather than being blown up.
+      // startDrag() snaps scale back to 1 on pickup, so the authored size is
+      // still what actually gets placed into the finished picture.
+      var fit = trayCellSize / s.size;
+      var grow = (trayCellSize * TRAY_TARGET_FILL) / s.size;
+      s.trayScale = Math.min(fit, Math.max(1, grow));
     });
   }
 
@@ -585,8 +599,9 @@ PeelIt.Game = (function () {
     ctx.translate(-DESIGN_W / 2, -DESIGN_H / 2);
 
     renderBackground();
-    renderSceneOutlines();
+    renderSceneOutlines(false);   // future/locked outlines: under the placed art
     renderPlacedStickers();
+    renderSceneOutlines(true);    // active (next-to-place) outline: ON TOP of placed
     renderTray();
     if (activeDrag) activeDrag.draw(ctx);
     if (hintActive || adHintActive) renderHint();
@@ -627,12 +642,22 @@ PeelIt.Game = (function () {
     ctx.restore();
   }
 
-  function renderSceneOutlines() {
+  // Drawn in TWO passes around renderPlacedStickers():
+  //  - activeOnly=false: the dimmed future/locked outlines, painted UNDER the
+  //    placed art so they don't clutter over finished pieces.
+  //  - activeOnly=true: the outline(s) for the piece you place next, painted
+  //    OVER the placed art. Many pieces target a spot that sits on top of an
+  //    already-placed piece (the cat's eyes over its head, the planet's spots
+  //    over its body); drawing every outline before the placed art buried
+  //    those, so the player couldn't see where the next piece goes. Splitting
+  //    the active outline into an on-top pass keeps it always visible.
+  function renderSceneOutlines(activeOnly) {
     var activeZ = minUnplacedZ();
     stickers.forEach(function (s) {
       if (s.state === 'placed' || s.state === 'settling') return;
-      var dimmed = s.z !== activeZ;
-      PeelIt.Sticker.drawOutline(ctx, s.shape, s.size, s.targetX, s.targetY, s.targetRot, dimmed);
+      var isActive = s.z === activeZ;
+      if (activeOnly !== isActive) return;
+      PeelIt.Sticker.drawOutline(ctx, s.shape, s.size, s.targetX, s.targetY, s.targetRot, !isActive);
     });
   }
 
@@ -662,21 +687,103 @@ PeelIt.Game = (function () {
     ctx.fillRect(0, top, DESIGN_W, DESIGN_H - top);
     ctx.restore();
 
+    // Per-piece "slot cards": a soft rounded card behind each tray piece.
+    // Without this, a white/pale piece (a #FFFFFF candle, cloud, glass, tank,
+    // or any shape whose art is translucent-white) is drawn white-on-white
+    // over the scrim above and effectively disappears - the exact "pieces
+    // hidden in the background" bug. The card gives every piece, whatever its
+    // colour, an edge to read against, so the fix is structural: a future
+    // level using a white piece is safe by default with no per-shape work.
+    //
+    // Drawn in their OWN pass, before the pieces, and always at full opacity -
+    // NOT inside the z-lock dim block below. A locked (not-yet-grabbable)
+    // piece is still greyed/faded to signal "wait your turn", but its card
+    // stays solid underneath, so even a dimmed pale piece is clearly visible.
+    ctx.save();
+    stickers.forEach(function (s) {
+      if (s === activeDrag) return;
+      if (s.state === 'tray' || s.state === 'returning') drawTrayCard(s.trayX, s.trayY);
+    });
+    ctx.restore();
+
     stickers.forEach(function (s) {
       if (s === activeDrag) return;
       if (s.state === 'tray' || s.state === 'returning') {
         var locked = s.state === 'tray' && s.z !== activeZ;
+        ctx.save();
+        // Soft contrast halo around the piece ART itself: a canvas shadow set
+        // on ctx makes every fill the shape paints cast a faint dark glow, so
+        // a pure-white piece with no outline of its own (candle, frosting,
+        // cloud, glass...) still gets a readable edge against the pale card -
+        // the card alone isn't enough for white-on-light. Works for ANY shape,
+        // including multi-part ones (scalloped frosting, dotted sprinkles),
+        // with zero per-shape code, so future white pieces are covered too.
+        // Tray-only: the shadow is on the local ctx.save() and never touches
+        // the placed/dragged art. Skipped for 'returning' pieces mid-flight so
+        // the halo doesn't smear across their motion.
+        if (s.state === 'tray') {
+          ctx.shadowColor = 'rgba(90,70,110,0.55)';
+          ctx.shadowBlur = 7;
+        }
         if (locked) {
-          ctx.save();
           ctx.globalAlpha = 0.45;
           ctx.filter = 'grayscale(0.8)';
-          s.draw(ctx);
-          ctx.restore();
-        } else {
-          s.draw(ctx);
         }
+        s.draw(ctx);
+        ctx.restore();
       }
     });
+  }
+
+  // Soft rounded card drawn behind a tray piece (see renderTray). Sized off
+  // trayCellSize so it tracks the reflowing grid, with a small inset so
+  // neighbouring cards never touch. Faintly tinted (not pure white) so white
+  // pieces gain contrast, with a soft drop shadow + hairline border. Mirrors
+  // the DOM .level-card look (rounded, white, soft purple shadow) so the tray
+  // feels of a piece with the rest of the UI.
+  function drawTrayCard(cx, cy) {
+    var side = trayCellSize + 14; // slightly larger than the piece footprint
+    var half = side / 2;
+    var radius = Math.min(22, half);
+    ctx.save();
+    // Shadow pass: draw the rounded silhouette once just for its drop shadow,
+    // then paint the real fill on top with the shadow disabled (so the tinted
+    // gradient below isn't itself dimmed by the shadow settings).
+    ctx.shadowColor = 'rgba(70,50,90,0.20)';
+    ctx.shadowBlur = 12;
+    ctx.shadowOffsetY = 4;
+    roundRectPath(ctx, cx - half, cy - half, side, side, radius);
+    ctx.fillStyle = '#EDE6F6';
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    // Tinted lilac-grey fill (NOT near-white): a white/pale piece is drawn on
+    // top of this, so the card must be clearly darker than the piece to give
+    // it contrast - a near-white card would leave white pieces invisible,
+    // which is the whole bug. A soft top-light/bottom-shade gradient keeps it
+    // reading as a rounded "slot" rather than a flat swatch.
+    var g = ctx.createLinearGradient(0, cy - half, 0, cy + half);
+    g.addColorStop(0, '#F1ECF8');
+    g.addColorStop(1, '#E3D9F0');
+    roundRectPath(ctx, cx - half, cy - half, side, side, radius);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(120,100,150,0.28)';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Local rounded-rect path helper. Not using the native ctx.roundRect: it is
+  // absent on some of the older mobile webviews Playgama distributes to, and
+  // the rest of this project deliberately avoids relying on newer canvas APIs.
+  function roundRectPath(c, x, y, w, h, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
   }
 
   // Shared visual for both the first-level onboarding tutorial (hintActive)
