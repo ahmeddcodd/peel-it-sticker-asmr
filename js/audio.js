@@ -291,33 +291,38 @@ PeelIt.Audio = (function () {
   // clock, so the groove stays tight and loops seamlessly forever. The grid is
   // 16 sixteenth-steps per bar; SWING pushes the off-eighths late for feel.
   var MUSIC_LEVEL = 0.34;      // pre-bus; sits as a bed UNDER the SFX feedback
-  var DUCK_LEVEL = 0.4;        // multiplier applied to the music while peeling
-  var BPM = 74;                // classic lo-fi tempo
-  var SWING = 0.55;            // 0.5 = straight; >0.5 delays the off-16ths
+  var DUCK_LEVEL = 0.45;       // multiplier applied to the music while peeling
+  var BPM = 92;                // upbeat, driving - energetic without being frantic
+  var SWING = 0.52;            // light swing only; keep the groove tight/consistent
   var SCHEDULE_AHEAD = 0.25;   // seconds of notes queued each tick
   var LOOKAHEAD_MS = 30;       // scheduler wake interval
   var STEPS_PER_BAR = 16;
-  var BARS = 8;
+  var BARS = 4;                // short, catchy loop that repeats confidently
   var TOTAL_STEPS = STEPS_PER_BAR * BARS;
 
-  // Chord progression (8 bars): a warm, wistful loop in A minor / C major.
+  // Chord progression (4 bars): a bright, driving loop in C major / A minor.
+  // Am - F - C - G  (the classic uplifting pop/hypercasual turnaround).
   // Each entry: { root: bass note (Hz), notes: [chord voicing Hz] }.
-  // Am7 - Fmaj7 - Cmaj7 - G  |  Am7 - Fmaj7 - Dm7 - E7(ish)
   var A2 = 110.00, C3 = 130.81, D3 = 146.83, E3 = 164.81, F3 = 174.61, G3 = 196.00;
   var A3 = 220.00, C4 = 261.63, D4 = 293.66, E4 = 329.63, F4 = 349.23, G4 = 392.00, B3 = 246.94;
   var PROG = [
-    { root: A2, notes: [A3, C4, E4, G4] },   // Am7
-    { root: F3, notes: [F3, A3, C4, E4] },   // Fmaj7
-    { root: C3, notes: [G3, C4, E4, B3 * 2] },// Cmaj7
-    { root: G3, notes: [G3, B3, D4, G4] },   // G
-    { root: A2, notes: [A3, C4, E4, G4] },   // Am7
-    { root: F3, notes: [F3, A3, C4, E4] },   // Fmaj7
-    { root: D3, notes: [D4, F4, A3, C4] },   // Dm7
-    { root: E3, notes: [E3, G3 * 1.06, B3, D4] } // E7-ish (soft tension -> resolves to Am)
+    { root: A2, notes: [A3, C4, E4] },   // Am
+    { root: F3, notes: [F3, A3, C4] },   // F
+    { root: C3, notes: [C4, E4, G4] },   // C
+    { root: G3, notes: [G3, B3, D4] }    // G
   ];
-  // Pentatonic pool for the bell lead (A minor pentatonic), harmonises with
-  // the placement chime's scale.
-  var LEAD_POOL = [440.00, 523.25, 587.33, 659.25, 783.99, 880.00];
+
+  // A FIXED, repeating melodic hook (A/C-major pentatonic) - one entry per
+  // 16th step of the bar (16 slots), null = rest. Deterministic so it's a
+  // real, catchy riff that repeats every bar, not random sprinkles. The riff
+  // is transposed slightly per chord (see leadNote) so it sits on the harmony.
+  var C5 = 523.25, D5 = 587.33, E5 = 659.25, G5 = 783.99, A5 = 880.00, B4 = 493.88;
+  //                0    1   2    3   4   5   6    7    8   9  10   11  12  13  14  15
+  var HOOK = [     E5, null, G5, null, A5, null, G5, null, E5, null, D5, null, C5, null, D5, null];
+
+  // Steady 16-step bass rhythm (indices that fire within each bar). A driving
+  // pattern so the low end pushes the beat forward every bar, consistently.
+  var BASS_HITS = [0, 3, 6, 8, 11, 14];
 
   var music = null;
 
@@ -502,67 +507,75 @@ PeelIt.Audio = (function () {
     });
   }
 
-  function voiceLead(t, freq) {
-    var osc = ctx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.value = freq;
-    var g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.22, t + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+  function voiceLead(t, freq, level) {
+    level = level || 0.24;
+    // Two detuned oscillators for a fuller, more present pluck lead that cuts
+    // through the beat. Quick attack + medium decay = bright and rhythmic.
+    var out = ctx.createGain();
+    out.gain.setValueAtTime(0.0001, t);
+    out.gain.exponentialRampToValueAtTime(level, t + 0.012);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
     var lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 2600;
-    osc.connect(g); g.connect(lp); lp.connect(music.musicGain);
-    osc.start(t); osc.stop(t + 0.75);
+    lp.frequency.value = 3200;
+    out.connect(lp); lp.connect(music.musicGain);
+    [['triangle', 1, 0.7], ['square', 1.003, 0.12]].forEach(function (v) {
+      var osc = ctx.createOscillator();
+      osc.type = v[0];
+      osc.frequency.value = freq * v[1];
+      var vg = ctx.createGain();
+      vg.gain.value = v[2];
+      osc.connect(vg); vg.connect(out);
+      osc.start(t); osc.stop(t + 0.45);
+    });
+  }
+
+  // Transpose the fixed HOOK riff to lean on each chord while keeping the same
+  // contour. Deterministic multipliers move the whole hook by a few scale steps
+  // per chord (Am/F/C/G), so it stays recognisable but never clashes.
+  function leadNote(freq, bar) {
+    var mul = [1.0, 0.87055, 0.79370, 0.94387][bar % 4]; // ~0, -2.4, -4, -1 semitone-ish
+    return freq * mul;
   }
 
   // ---- pattern ----------------------------------------------------------
-  // step is 0..127 (16 per bar x 8 bars). Drums use classic boom-bap
-  // placement; bass follows chord roots; chords land on the downbeat and the
-  // "and" of 3; the lead sprinkles pentatonic notes sparsely.
+  // 16 steps/bar x 4 bars. The groove is fully DETERMINISTIC and steady - a
+  // driving kick, locked backbeat, constant hats, a rhythmic bass every bar,
+  // chord stabs on every beat, and a fixed repeating melodic hook - so it reads
+  // as an energetic, consistent loop rather than a sparse random ambience.
   function playMusicStep(step, t) {
     var bar = Math.floor(step / STEPS_PER_BAR);
     var s = step % STEPS_PER_BAR; // 0..15 within the bar
     var chord = PROG[bar % PROG.length];
     var beatDur = sixteenthDur() * 4;
 
-    // -- Kick: beats 1 and 3, plus a syncopated ghost on the "a" of 2 in odd
-    //    bars for groove.
-    if (s === 0 || s === 8) voiceKick(t, 0.9);
-    if (s === 11 && bar % 2 === 1) voiceKick(t, 0.55);
+    // -- Kick: a driving pulse. Beats 1 & 3 hard, plus the "and" of 2 and the
+    //    "a" of 4 every bar (consistent) so the low end pushes constantly.
+    if (s === 0 || s === 8) voiceKick(t, 0.95);
+    if (s === 6 || s === 14) voiceKick(t, 0.62);
 
-    // -- Snare/rim: backbeat on 2 and 4.
-    if (s === 4 || s === 12) voiceSnare(t, 0.5);
+    // -- Snare/clap: locked backbeat on 2 and 4, every bar.
+    if (s === 4 || s === 12) voiceSnare(t, 0.55);
 
-    // -- Hats: every 8th note, with a lightly randomized velocity and an
-    //    occasional open hat before the backbeat for that lo-fi shuffle.
-    if (s % 2 === 0) {
-      var vel = 0.1 + (s % 4 === 0 ? 0.05 : 0) + Math.random() * 0.03;
-      var open = (s === 6 || s === 14) && Math.random() < 0.5;
-      voiceHat(t, vel, open);
+    // -- Hats: steady on every 8th, with a firm accent on the beat. A driving
+    //    16th "and-a" push into each backbeat for energy - fixed, not random.
+    if (s % 2 === 0) voiceHat(t, s % 4 === 0 ? 0.16 : 0.11, false);
+    if (s === 7 || s === 15) voiceHat(t, 0.13, false); // extra 16th push
+
+    // -- Bass: a rhythmic root pattern every bar (BASS_HITS), octave-up accents
+    //    on the off-beats so it grooves rather than sits on one held note.
+    if (BASS_HITS.indexOf(s) !== -1) {
+      var up = (s === 3 || s === 11);           // little octave pops for movement
+      voiceBass(t, chord.root * (up ? 2 : 1), beatDur * (s === 0 ? 1.1 : 0.5));
     }
 
-    // -- Bass: root on the downbeat (held ~2 beats), plus a walk-up/again note
-    //    on beat 3's "and" so it moves rather than sits.
-    if (s === 0) voiceBass(t, chord.root, beatDur * 2.2);
-    if (s === 10) voiceBass(t, chord.root * (bar % 2 === 0 ? 1.5 : 1.335), beatDur * 1.2); // 5th / 4th walk
+    // -- Chords: a rhythmic stab on every beat (0,4,8,12) - short and punchy so
+    //    the harmony drives the groove instead of drifting.
+    if (s % 4 === 0) voiceChord(t, chord.notes, beatDur * 0.9, 0.2);
 
-    // -- Chords: a soft stab on the downbeat (held) and a shorter one on the
-    //    "and" of beat 3, so the harmony breathes with the groove.
-    if (s === 0) voiceChord(t, chord.notes, beatDur * 2.6, 0.22);
-    if (s === 10) voiceChord(t, chord.notes, beatDur * 1.4, 0.13);
-
-    // -- Bell lead: sparse, mostly on off-beats, denser in the 2nd half of the
-    //    loop so the 8 bars build a little. Skipped often for space.
-    var half = bar >= 4;
-    var leadChance = half ? 0.3 : 0.16;
-    if ((s === 6 || s === 10 || s === 14 || s === 3) && Math.random() < leadChance) {
-      var idx = (step * 5 + bar * 2) % LEAD_POOL.length;
-      var f = LEAD_POOL[idx];
-      if (Math.random() < 0.25) f *= 2; // occasional octave sparkle
-      voiceLead(t, f);
-    }
+    // -- Lead: the FIXED hook riff, one note per HOOK slot, transposed to the
+    //    chord. Plays every bar so it's a real, catchy, repeating melody.
+    if (HOOK[s] != null) voiceLead(t, leadNote(HOOK[s], bar), 0.22);
   }
 
   // Dip / restore the music under the ASMR peel sound. Called on drag start
