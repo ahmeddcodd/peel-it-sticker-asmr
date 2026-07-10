@@ -274,64 +274,63 @@ PeelIt.Audio = (function () {
     });
   }
 
-  // ---- Background music: procedural lo-fi chill beat --------------------
-  // Fully synthesized, zero audio files (in keeping with the whole game). A
-  // proper lo-fi hip-hop bed: swung boom-bap drums, a warm walking bass, a
-  // Rhodes-ish chord instrument with vibrato, and a sparse bell lead - a real
-  // rhythmic pocket rather than a thin arpeggio-over-pads.
+  // ---- Background music: procedural mellow lo-fi loop -------------------
+  // Fully synthesized, zero audio files. Rebuilt around a CORRECT musical
+  // foundation: every pitch is a MIDI note number from one C-major scale, so
+  // the melody, bass and chords are guaranteed in-key and consonant (the prior
+  // version multiplied frequencies by arbitrary ratios and produced clashing,
+  // shrill notes). Warm, gentle, and coherent - a real little tune that loops.
   //
-  // Bus:  voices -> musicGain -> duckGain -> musicBus(lowpass+saturator) -> master
-  //   - musicGain : fixed music level, well under the SFX.
+  // Bus:  voices -> musicGain -> duckGain -> saturator -> busLowpass -> master
+  //   - musicGain : fixed music level, sits UNDER the SFX feedback.
   //   - duckGain  : dipped while peeling so the ASMR crinkle leads (duckMusic).
-  //   - musicBus  : a gentle lowpass + soft saturation over the WHOLE mix for
-  //                 that warm, rounded lo-fi glue.
+  //   - saturator + busLowpass : soft warmth/glue, rolled-off highs.
   //   - master    : shared bus, so mute + ad/background suspend already apply.
-  //
-  // Timing: a look-ahead scheduler queues notes on the precise AudioContext
-  // clock, so the groove stays tight and loops seamlessly forever. The grid is
-  // 16 sixteenth-steps per bar; SWING pushes the off-eighths late for feel.
-  var MUSIC_LEVEL = 0.34;      // pre-bus; sits as a bed UNDER the SFX feedback
-  var DUCK_LEVEL = 0.45;       // multiplier applied to the music while peeling
-  var BPM = 92;                // upbeat, driving - energetic without being frantic
-  var SWING = 0.52;            // light swing only; keep the groove tight/consistent
-  var SCHEDULE_AHEAD = 0.25;   // seconds of notes queued each tick
-  var LOOKAHEAD_MS = 30;       // scheduler wake interval
-  var STEPS_PER_BAR = 16;
-  var BARS = 4;                // short, catchy loop that repeats confidently
+  var MUSIC_LEVEL = 0.42;
+  var DUCK_LEVEL = 0.45;
+  var BPM = 84;                // relaxed but with a clear groove
+  var SWING = 0.56;            // gentle lo-fi shuffle on the off-8ths
+  var SCHEDULE_AHEAD = 0.25;
+  var LOOKAHEAD_MS = 30;
+  var STEPS_PER_BAR = 8;       // 8th-note grid (2 per beat) - simpler + tighter
+  var BARS = 4;
   var TOTAL_STEPS = STEPS_PER_BAR * BARS;
 
-  // Chord progression (4 bars): a bright, driving loop in C major / A minor.
-  // Am - F - C - G  (the classic uplifting pop/hypercasual turnaround).
-  // Each entry: { root: bass note (Hz), notes: [chord voicing Hz] }.
-  var A2 = 110.00, C3 = 130.81, D3 = 146.83, E3 = 164.81, F3 = 174.61, G3 = 196.00;
-  var A3 = 220.00, C4 = 261.63, D4 = 293.66, E4 = 329.63, F4 = 349.23, G4 = 392.00, B3 = 246.94;
+  // MIDI note -> frequency. Everything below is written as MIDI numbers so it
+  // stays strictly in key; 60 = C4, 69 = A4 (440Hz).
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+  // Progression (4 bars), the warm/uplifting C-major turnaround: C  G  Am  F.
+  // Each entry: { bass: MIDI root, chord: [MIDI chord tones] } in a cosy octave.
   var PROG = [
-    { root: A2, notes: [A3, C4, E4] },   // Am
-    { root: F3, notes: [F3, A3, C4] },   // F
-    { root: C3, notes: [C4, E4, G4] },   // C
-    { root: G3, notes: [G3, B3, D4] }    // G
+    { bass: 36, chord: [48, 52, 55] },  // C   (C3 E3 G3)
+    { bass: 43, chord: [47, 50, 55] },  // G   (B2 D3 G3)
+    { bass: 33, chord: [48, 52, 57] },  // Am  (C3 E3 A3)
+    { bass: 41, chord: [45, 48, 53] }   // F   (A2 C3 F3)
   ];
 
-  // A FIXED, repeating melodic hook (A/C-major pentatonic) - one entry per
-  // 16th step of the bar (16 slots), null = rest. Deterministic so it's a
-  // real, catchy riff that repeats every bar, not random sprinkles. The riff
-  // is transposed slightly per chord (see leadNote) so it sits on the harmony.
-  var C5 = 523.25, D5 = 587.33, E5 = 659.25, G5 = 783.99, A5 = 880.00, B4 = 493.88;
-  //                0    1   2    3   4   5   6    7    8   9  10   11  12  13  14  15
-  var HOOK = [     E5, null, G5, null, A5, null, G5, null, E5, null, D5, null, C5, null, D5, null];
+  // A written melody: one MIDI note (or null=rest) per 8th step, across all
+  // 4 bars (32 slots). All notes are C-major scale tones that resolve over the
+  // chords - a simple, singable, repeating hook that actually makes sense.
+  // Bars:      C            |      G            |      Am           |      F
+  var MELODY = [
+    67, null, 64, 67,  62, null, 64, null,   // C: G4 . E4 G4  D4 . E4 .
+    71, null, 67, null, 69, 67, 64, null,   // G: B4 . G4 .   A4 G4 E4 .
+    72, null, 69, 72,  71, null, 69, null,   // Am: C5 . A4 C5  B4 . A4 .
+    69, 67, 64, null,  62, null, 60, null    // F: A4 G4 E4 .  D4 . C4 .
+  ];
 
-  // Steady 16-step bass rhythm (indices that fire within each bar). A driving
-  // pattern so the low end pushes the beat forward every bar, consistently.
-  var BASS_HITS = [0, 3, 6, 8, 11, 14];
+  // Bass rhythm within a bar (8th-note indices that fire). Root-driven with a
+  // little pickup on the "and" of beat 2 for movement - consistent every bar.
+  var BASS_HITS = [0, 3, 4, 6];
 
   var music = null;
 
-  // Soft saturation curve for warmth/glue on the whole music bus.
   function makeSaturationCurve(amount) {
     var n = 1024, curve = new Float32Array(n), k = amount;
     for (var i = 0; i < n; i++) {
       var x = (i / (n - 1)) * 2 - 1;
-      curve[i] = (1 + k) * x / (1 + k * Math.abs(x)); // gentle soft-clip
+      curve[i] = (1 + k) * x / (1 + k * Math.abs(x));
     }
     return curve;
   }
@@ -340,39 +339,37 @@ PeelIt.Audio = (function () {
     ensureContext();
     if (!ctx || music) return;
 
-    // Bus chain: musicGain -> duckGain -> saturator -> busLowpass -> master.
     var musicGain = ctx.createGain();
     musicGain.gain.value = MUSIC_LEVEL;
     var duckGain = ctx.createGain();
     duckGain.gain.value = 1;
     var sat = ctx.createWaveShaper();
-    sat.curve = makeSaturationCurve(0.6);
+    sat.curve = makeSaturationCurve(0.4);
     sat.oversample = '2x';
     var busLp = ctx.createBiquadFilter();
     busLp.type = 'lowpass';
-    busLp.frequency.value = 5200;   // roll off harsh highs -> mellow tape feel
-    busLp.Q.value = 0.4;
+    busLp.frequency.value = 4200;   // mellow, rounded top end
+    busLp.Q.value = 0.3;
     musicGain.connect(duckGain);
     duckGain.connect(sat);
     sat.connect(busLp);
     busLp.connect(master);
 
-    // Continuous vinyl-crackle bed: quiet looped noise through a highpass, for
-    // that lo-fi texture between hits. Very low level so it's felt not heard.
+    // Quiet vinyl-crackle texture bed.
     var vinylSrc = ctx.createBufferSource();
     vinylSrc.buffer = noiseBuffer;
     vinylSrc.loop = true;
     var vinylHp = ctx.createBiquadFilter();
     vinylHp.type = 'highpass';
-    vinylHp.frequency.value = 3000;
+    vinylHp.frequency.value = 4000;
     var vinylGain = ctx.createGain();
-    vinylGain.gain.value = 0.012;
+    vinylGain.gain.value = 0.009;
     vinylSrc.connect(vinylHp); vinylHp.connect(vinylGain); vinylGain.connect(musicGain);
     vinylSrc.start();
 
     music = {
       timer: null,
-      nextNoteTime: now() + 0.06,
+      nextNoteTime: now() + 0.08,
       step: 0,
       musicGain: musicGain,
       duckGain: duckGain,
@@ -381,205 +378,169 @@ PeelIt.Audio = (function () {
     music.timer = window.setInterval(scheduleMusic, LOOKAHEAD_MS);
   }
 
-  function sixteenthDur() { return (60 / BPM) / 4; }
+  function eighthDur() { return (60 / BPM) / 2; }
 
   function scheduleMusic() {
     if (!music || !ctx) return;
     if (ctx.state !== 'running') { music.nextNoteTime = now(); return; }
-
     while (music.nextNoteTime < now() + SCHEDULE_AHEAD) {
       var step = music.step;
-      // Swing: delay the 2nd sixteenth of every eighth-note pair.
-      var swingOffset = (step % 2 === 1) ? (SWING - 0.5) * 2 * sixteenthDur() : 0;
+      // Swing: delay the off-8th (odd steps) for a lo-fi shuffle.
+      var swingOffset = (step % 2 === 1) ? (SWING - 0.5) * 2 * eighthDur() : 0;
       playMusicStep(step, music.nextNoteTime + swingOffset);
-      music.nextNoteTime += sixteenthDur();
+      music.nextNoteTime += eighthDur();
       music.step = (music.step + 1) % TOTAL_STEPS;
     }
   }
 
-  // ---- lo-fi voices -----------------------------------------------------
+  // ---- voices -----------------------------------------------------------
   function voiceKick(t, gain) {
     var osc = ctx.createOscillator();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(140, t);
-    osc.frequency.exponentialRampToValueAtTime(48, t + 0.12);
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(45, t + 0.11);
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(gain, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
     osc.connect(g); g.connect(music.musicGain);
-    osc.start(t); osc.stop(t + 0.34);
+    osc.start(t); osc.stop(t + 0.3);
   }
 
   function voiceSnare(t, gain) {
-    // Filtered noise burst + a short body tone = soft lo-fi snare/rim.
     var src = ctx.createBufferSource();
     src.buffer = noiseBuffer;
     var bp = ctx.createBiquadFilter();
     bp.type = 'bandpass';
-    bp.frequency.value = 1900;
-    bp.Q.value = 0.8;
+    bp.frequency.value = 1700;
+    bp.Q.value = 0.7;
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.006);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
     src.connect(bp); bp.connect(g); g.connect(music.musicGain);
-    src.start(t); src.stop(t + 0.2);
-
-    var body = ctx.createOscillator();
-    body.type = 'triangle';
-    body.frequency.setValueAtTime(220, t);
-    body.frequency.exponentialRampToValueAtTime(160, t + 0.08);
-    var bg = ctx.createGain();
-    bg.gain.setValueAtTime(0.0001, t);
-    bg.gain.exponentialRampToValueAtTime(gain * 0.5, t + 0.006);
-    bg.gain.exponentialRampToValueAtTime(0.0001, t + 0.1);
-    body.connect(bg); bg.connect(music.musicGain);
-    body.start(t); body.stop(t + 0.12);
+    src.start(t); src.stop(t + 0.18);
   }
 
-  function voiceHat(t, gain, open) {
+  function voiceHat(t, gain) {
     var src = ctx.createBufferSource();
     src.buffer = noiseBuffer;
     var hp = ctx.createBiquadFilter();
     hp.type = 'highpass';
-    hp.frequency.value = 7000;
+    hp.frequency.value = 8000;
     var g = ctx.createGain();
-    var dur = open ? 0.14 : 0.045;
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(gain, t + 0.004);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    g.gain.exponentialRampToValueAtTime(gain, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
     src.connect(hp); hp.connect(g); g.connect(music.musicGain);
-    src.start(t); src.stop(t + dur + 0.02);
+    src.start(t); src.stop(t + 0.06);
   }
 
-  function voiceBass(t, freq, dur) {
+  function voiceBass(t, midi, dur) {
+    var freq = mtof(midi);
     var osc = ctx.createOscillator();
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, t);
-    var sub = ctx.createOscillator(); // a touch of sine sub under it
-    sub.type = 'sine';
-    sub.frequency.setValueAtTime(freq, t);
+    osc.frequency.value = freq;
     var lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 420;
+    lp.frequency.value = 380;
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.5, t + 0.03);
-    g.gain.setTargetAtTime(0.0001, t + dur * 0.7, 0.12);
-    osc.connect(lp); sub.connect(lp); lp.connect(g); g.connect(music.musicGain);
+    g.gain.exponentialRampToValueAtTime(0.42, t + 0.02);
+    g.gain.setTargetAtTime(0.0001, t + dur * 0.6, 0.1);
+    osc.connect(lp); lp.connect(g); g.connect(music.musicGain);
     osc.start(t); osc.stop(t + dur + 0.1);
-    sub.start(t); sub.stop(t + dur + 0.1);
   }
 
-  // Rhodes-ish chord stab: stacked detuned sines, soft attack, vibrato LFO,
-  // through a lowpass. Longer sustain for held chords.
-  function voiceChord(t, notes, dur, level) {
+  // Warm Rhodes-ish chord: stacked sines with a gentle vibrato, soft attack,
+  // lowpassed. Held across the bar so the harmony is a smooth bed.
+  function voiceChord(t, midis, dur, level) {
     var out = ctx.createGain();
     out.gain.setValueAtTime(0.0001, t);
-    out.gain.linearRampToValueAtTime(level, t + 0.04);
-    out.gain.setTargetAtTime(0.0001, t + dur * 0.6, 0.18);
+    out.gain.linearRampToValueAtTime(level, t + 0.05);
+    out.gain.setTargetAtTime(0.0001, t + dur * 0.7, 0.2);
     var lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 1600;
+    lp.frequency.value = 1400;
     out.connect(lp); lp.connect(music.musicGain);
 
-    // shared vibrato
     var lfo = ctx.createOscillator();
     lfo.type = 'sine';
-    lfo.frequency.value = 5.2;
+    lfo.frequency.value = 4.6;
     var lfoGain = ctx.createGain();
-    lfoGain.gain.value = 2.4; // Hz of pitch wobble
+    lfoGain.gain.value = 1.6;
     lfo.connect(lfoGain);
     lfo.start(t); lfo.stop(t + dur + 0.2);
 
-    notes.forEach(function (f) {
-      [0, 0.5].forEach(function (detCents, idx) {
-        var osc = ctx.createOscillator();
-        osc.type = idx === 0 ? 'sine' : 'triangle';
-        osc.frequency.value = f * (1 + detCents / 1000);
-        var vg = ctx.createGain();
-        vg.gain.value = idx === 0 ? 0.5 : 0.16;
-        lfoGain.connect(osc.frequency);
-        osc.connect(vg); vg.connect(out);
-        osc.start(t); osc.stop(t + dur + 0.2);
-      });
+    midis.forEach(function (m) {
+      var osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = mtof(m);
+      var vg = ctx.createGain();
+      vg.gain.value = 0.34;
+      lfoGain.connect(osc.frequency);
+      osc.connect(vg); vg.connect(out);
+      osc.start(t); osc.stop(t + dur + 0.2);
     });
   }
 
-  function voiceLead(t, freq, level) {
-    level = level || 0.24;
-    // Two detuned oscillators for a fuller, more present pluck lead that cuts
-    // through the beat. Quick attack + medium decay = bright and rhythmic.
+  // Soft mellow bell/marimba-ish lead: sine + a quiet octave for body, gentle
+  // attack, natural decay. Warm rather than piercing.
+  function voiceLead(t, midi, level) {
+    var freq = mtof(midi);
     var out = ctx.createGain();
     out.gain.setValueAtTime(0.0001, t);
-    out.gain.exponentialRampToValueAtTime(level, t + 0.012);
-    out.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    out.gain.exponentialRampToValueAtTime(level, t + 0.02);
+    out.gain.exponentialRampToValueAtTime(0.0001, t + 0.55);
     var lp = ctx.createBiquadFilter();
     lp.type = 'lowpass';
-    lp.frequency.value = 3200;
+    lp.frequency.value = 2400;
     out.connect(lp); lp.connect(music.musicGain);
-    [['triangle', 1, 0.7], ['square', 1.003, 0.12]].forEach(function (v) {
+    [[1, 0.6], [2, 0.12]].forEach(function (v) {
       var osc = ctx.createOscillator();
-      osc.type = v[0];
-      osc.frequency.value = freq * v[1];
+      osc.type = 'sine';
+      osc.frequency.value = freq * v[0];
       var vg = ctx.createGain();
-      vg.gain.value = v[2];
+      vg.gain.value = v[1];
       osc.connect(vg); vg.connect(out);
-      osc.start(t); osc.stop(t + 0.45);
+      osc.start(t); osc.stop(t + 0.6);
     });
-  }
-
-  // Transpose the fixed HOOK riff to lean on each chord while keeping the same
-  // contour. Deterministic multipliers move the whole hook by a few scale steps
-  // per chord (Am/F/C/G), so it stays recognisable but never clashes.
-  function leadNote(freq, bar) {
-    var mul = [1.0, 0.87055, 0.79370, 0.94387][bar % 4]; // ~0, -2.4, -4, -1 semitone-ish
-    return freq * mul;
   }
 
   // ---- pattern ----------------------------------------------------------
-  // 16 steps/bar x 4 bars. The groove is fully DETERMINISTIC and steady - a
-  // driving kick, locked backbeat, constant hats, a rhythmic bass every bar,
-  // chord stabs on every beat, and a fixed repeating melodic hook - so it reads
-  // as an energetic, consistent loop rather than a sparse random ambience.
+  // 8 steps/bar x 4 bars = 32 steps. Deterministic, in-key, and coherent: a
+  // relaxed boom-bap kick, backbeat snare, steady hats, a rooted bass, a held
+  // warm chord per bar, and the written MELODY on top.
   function playMusicStep(step, t) {
     var bar = Math.floor(step / STEPS_PER_BAR);
-    var s = step % STEPS_PER_BAR; // 0..15 within the bar
-    var chord = PROG[bar % PROG.length];
-    var beatDur = sixteenthDur() * 4;
+    var s = step % STEPS_PER_BAR; // 0..7 within the bar (8th notes)
+    var prog = PROG[bar % PROG.length];
+    var barDur = eighthDur() * STEPS_PER_BAR;
 
-    // -- Kick: a driving pulse. Beats 1 & 3 hard, plus the "and" of 2 and the
-    //    "a" of 4 every bar (consistent) so the low end pushes constantly.
-    if (s === 0 || s === 8) voiceKick(t, 0.95);
-    if (s === 6 || s === 14) voiceKick(t, 0.62);
+    // -- Kick: beats 1 and 3 (steps 0 and 4), with a soft pickup on the "and"
+    //    of 4 (step 7) for a gentle lo-fi bounce.
+    if (s === 0 || s === 4) voiceKick(t, 0.9);
+    if (s === 7) voiceKick(t, 0.5);
 
-    // -- Snare/clap: locked backbeat on 2 and 4, every bar.
-    if (s === 4 || s === 12) voiceSnare(t, 0.55);
+    // -- Snare: backbeat on 2 and 4 (steps 2 and 6).
+    if (s === 2 || s === 6) voiceSnare(t, 0.5);
 
-    // -- Hats: steady on every 8th, with a firm accent on the beat. A driving
-    //    16th "and-a" push into each backbeat for energy - fixed, not random.
-    if (s % 2 === 0) voiceHat(t, s % 4 === 0 ? 0.16 : 0.11, false);
-    if (s === 7 || s === 15) voiceHat(t, 0.13, false); // extra 16th push
+    // -- Hats: every 8th, accented on the beat. Steady and consistent.
+    voiceHat(t, (s % 2 === 0) ? 0.12 : 0.08);
 
-    // -- Bass: a rhythmic root pattern every bar (BASS_HITS), octave-up accents
-    //    on the off-beats so it grooves rather than sits on one held note.
+    // -- Bass: rooted pattern each bar.
     if (BASS_HITS.indexOf(s) !== -1) {
-      var up = (s === 3 || s === 11);           // little octave pops for movement
-      voiceBass(t, chord.root * (up ? 2 : 1), beatDur * (s === 0 ? 1.1 : 0.5));
+      voiceBass(t, prog.bass, eighthDur() * (s === 0 ? 2.0 : 1.2));
     }
 
-    // -- Chords: a rhythmic stab on every beat (0,4,8,12) - short and punchy so
-    //    the harmony drives the groove instead of drifting.
-    if (s % 4 === 0) voiceChord(t, chord.notes, beatDur * 0.9, 0.2);
+    // -- Chord: one warm held stab at the top of each bar.
+    if (s === 0) voiceChord(t, prog.chord, barDur * 0.95, 0.16);
 
-    // -- Lead: the FIXED hook riff, one note per HOOK slot, transposed to the
-    //    chord. Plays every bar so it's a real, catchy, repeating melody.
-    if (HOOK[s] != null) voiceLead(t, leadNote(HOOK[s], bar), 0.22);
+    // -- Melody: the written hook, in key.
+    var mel = MELODY[step];
+    if (mel != null) voiceLead(t, mel, 0.2);
   }
 
-  // Dip / restore the music under the ASMR peel sound. Called on drag start
-  // (down=true) and release (down=false).
   function duckMusic(down) {
     if (!music || !ctx) return;
     music.duckGain.gain.setTargetAtTime(down ? DUCK_LEVEL : 1, now(), down ? 0.12 : 0.5);
