@@ -1,0 +1,240 @@
+:root {
+  --pink: #ff8fb3;
+  --lilac: #b79cff;
+  --cream: #fffaf3;
+  --ink: #4a3b57;
+  --ink-soft: #8b7a99;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+/* Playgama technical requirement: "There is no browser page scrolling
+   (browser window system scrollbar). However, it is allowed to implement
+   custom content scrolling within the game." position:fixed + inset:0 pins
+   the document to the visual viewport so it has nothing to scroll, and
+   touch-action:none stops the browser claiming touch-drags as pans (it was
+   previously set only on #game-canvas, leaving the DOM overlay screens
+   scrollable). The level list still scrolls - see .level-grid below. */
+html, body {
+  margin: 0; padding: 0;
+  position: fixed;
+  inset: 0;
+  width: 100%; height: 100%;
+  background: #241b2e;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+}
+
+#stage {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  background:
+    radial-gradient(circle at 30% 20%, #33243f, #1c1424 70%);
+}
+
+#frame {
+  position: relative;
+  border-radius: 1.375rem;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  background: #fdf3ff;
+}
+
+#game-canvas {
+  display: block;
+  width: 100%; height: 100%;
+  touch-action: none;
+  user-select: none;
+  -webkit-touch-callout: none; /* no iOS long-press callout menu on the game field */
+}
+
+/* ---- top bar --------------------------------------------------------- */
+#top-bar {
+  position: absolute; top: 0; left: 0; right: 0;
+  display: none;
+  align-items: center; justify-content: space-between;
+  padding: 0.875rem 1rem;
+  z-index: 5;
+  pointer-events: none;
+}
+#top-bar.visible { display: flex; }
+#top-bar > * { pointer-events: auto; }
+
+.top-bar-right { display: flex; gap: 0.5rem; }
+
+#level-name {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 1rem;
+  background: rgba(255,255,255,0.7);
+  padding: 0.375rem 1rem;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+
+.icon-btn {
+  width: 2.5rem; height: 2.5rem;
+  border-radius: 999px;
+  border: none;
+  background: rgba(255,255,255,0.75);
+  font-size: 1.125rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.icon-btn:active { transform: scale(0.92); }
+
+/* ---- overlay screens --------------------------------------------------- */
+.screen {
+  position: absolute; inset: 0;
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 10;
+  background: linear-gradient(160deg, rgba(255,232,240,0.97), rgba(230,220,255,0.97));
+}
+.screen.visible { display: flex; }
+
+/* Not scrollable itself: the 12-card level grid overflows this box by
+   ~800px, which turned it into a real scroll container (and a system
+   scrollbar). It's now a fixed-height flex column whose grid child is the
+   only thing that scrolls. */
+.screen-inner {
+  width: 100%; height: 100%;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 3rem 1.5rem 2rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 2.5rem;
+  color: var(--ink);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.subtitle {
+  margin: 0.25rem 0 1.75rem;
+  color: var(--ink-soft);
+  font-size: 0.875rem;
+  letter-spacing: 2px;
+  text-transform: lowercase;
+}
+
+/* ---- level select grid -------------------------------------------------- */
+/* The one sanctioned scroll surface: "custom content scrolling within the
+   game". touch-action:pan-y re-enables vertical touch scrolling here only,
+   since html/body now set touch-action:none globally. overscroll-behavior
+   :contain stops a scroll that hits the end from chaining out to the page. */
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  width: 100%;
+  max-width: 26.25rem;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.level-grid::-webkit-scrollbar { display: none; }
+
+.level-card {
+  border: none;
+  border-radius: 1.125rem;
+  background: #fff;
+  padding: 0.75rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  box-shadow: 0 6px 18px rgba(120,90,150,0.18);
+  cursor: pointer;
+}
+.level-card:active { transform: scale(0.96); }
+.level-card.locked { opacity: 0.55; cursor: default; }
+
+.level-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.875rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2.125rem;
+}
+
+.level-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.level-stars { display: flex; gap: 0.125rem; }
+.star { color: #ddd2ea; font-size: 0.875rem; }
+.star.filled { color: #ffc857; }
+
+/* ---- complete screen ----------------------------------------------------- */
+.complete-card {
+  justify-content: center;
+  text-align: center;
+}
+.sparkle { font-size: 2.5rem; margin-bottom: 0.25rem; }
+.complete-card h2 {
+  margin: 0 0 0.75rem;
+  color: var(--ink);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.stars-row { display: flex; gap: 0.5rem; margin-bottom: 1.75rem; }
+.stars-row .star { font-size: 2.125rem; }
+
+.button-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+
+.pill-btn {
+  border: none;
+  border-radius: 999px;
+  padding: 0.875rem 1.75rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pill-btn.primary {
+  background: linear-gradient(135deg, var(--pink), var(--lilac));
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(183,156,255,0.45);
+}
+.pill-btn.secondary {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 4px 12px rgba(120,90,150,0.18);
+}
+.pill-btn.foil {
+  background: linear-gradient(120deg, #ffe9a8, #ffd1f0, #c9e7ff, #ffe9a8);
+  background-size: 300% 100%;
+  animation: foil-shimmer 4s linear infinite;
+  color: var(--ink);
+  margin-bottom: 1rem;
+  box-shadow: 0 6px 16px rgba(255, 209, 140, 0.4);
+}
+.pill-btn.foil.unlocked {
+  animation: none;
+  background: #fff;
+  opacity: 0.75;
+  cursor: default;
+}
+@keyframes foil-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 300% 50%; }
+}
+.pill-btn:active { transform: scale(0.95); }
+
+.text-link {
+  border: none; background: none;
+  color: var(--ink-soft);
+  font-size: 0.8125rem;
+  text-decoration: underline;
+  cursor: pointer;
+}

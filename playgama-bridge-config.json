@@ -1,0 +1,16 @@
+{
+  "advertisement": {
+    "interstitial": {
+      "preloadOnStart": true,
+      "placements": [
+        { "id": "interstitial_level_transition" }
+      ]
+    },
+    "rewarded": {
+      "preloadOnStart": true,
+      "placements": [
+        { "id": "rewarded_foil_pack" }
+      ]
+    }
+  }
+}

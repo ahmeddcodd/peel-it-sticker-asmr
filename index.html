@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Peel it! - Sticker art ASMR</title>
+<meta name="description" content="A satisfying ASMR sticker-peeling hypercasual game.">
+<meta name="theme-color" content="#241b2e">
+<!-- Inline SVG favicon: keeps the project asset-free (all art is procedural)
+     and avoids a 404 on /favicon.ico. A peeling pink sticker corner. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='4' y='4' width='24' height='24' rx='6' fill='%23ff8fb3'/%3E%3Cpath d='M28 20v2a6 6 0 0 1-6 6h-2z' fill='%23fffaf3'/%3E%3Cpath d='M20 28l8-8a8 8 0 0 1-8 8z' fill='%23b79cff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="stage">
+    <div id="frame">
+      <canvas id="game-canvas"></canvas>
+
+      <div id="top-bar">
+        <button id="back-btn" class="icon-btn" aria-label="Back to levels">←</button>
+        <div id="level-name">Level</div>
+        <div class="top-bar-right">
+          <button id="hint-btn" class="icon-btn" aria-label="Watch an ad for a hint">💡</button>
+          <button id="mute-btn" class="icon-btn" aria-label="Mute">🔊</button>
+        </div>
+      </div>
+
+      <div id="screen-select" class="screen">
+        <div class="screen-inner">
+          <h1 class="title">peel it!</h1>
+          <p class="subtitle">sticker art asmr</p>
+          <div id="level-grid" class="level-grid"></div>
+        </div>
+      </div>
+
+      <div id="screen-complete" class="screen">
+        <div class="screen-inner complete-card">
+          <div class="sparkle">✨</div>
+          <h2 id="complete-title">Level complete!</h2>
+          <div id="complete-stars" class="stars-row"></div>
+          <button id="foil-btn" class="pill-btn foil">✨ Unlock foil pack</button>
+          <div class="button-row">
+            <button id="replay-btn" class="pill-btn secondary">Replay</button>
+            <button id="next-btn" class="pill-btn primary">Next →</button>
+          </div>
+          <button id="menu-btn" class="text-link">All levels</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!--
+    Playgama Bridge SDK - required for Playgama submission (game_ready
+    event + progress save/load + rewarded ads). Loaded as a plain blocking
+    script BEFORE sdk.js so window.bridge exists (or doesn't) by the time
+    sdk.js's platform detection runs. On any other host (GitHub Pages,
+    Vercel, a plain double-click of index.html, or no internet access)
+    this request simply fails and the game falls back to the plain "web"
+    adapter with zero effect on gameplay - see js/sdk.js.
+  -->
+  <script src="https://bridge.playgama.com/v1/stable/playgama-bridge.js"></script>
+  <script src="js/sdk.js"></script>
+  <script src="js/save.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/particles.js"></script>
+  <script src="js/sticker.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
