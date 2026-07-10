@@ -358,6 +358,10 @@ PeelIt.Game = (function () {
   // ---- input --------------------------------------------------------------
   function onPointerDown(e) {
     PeelIt.Audio.resume();
+    // Kick off the looping background music on the first user gesture (a no-op
+    // after the first call). Doing it here satisfies mobile autoplay policy -
+    // the same gesture that unlocks the AudioContext starts the music.
+    PeelIt.Audio.startMusic();
     if (gameState !== 'playing') return;
     if (activeDrag) return;
 
@@ -387,6 +391,7 @@ PeelIt.Game = (function () {
       lastPointerPos = p;
       PeelIt.Audio.playLift();
       PeelIt.Audio.startCrinkle();
+      PeelIt.Audio.duckMusic(true); // dip the music so the ASMR crinkle leads
       vibrate(6); // subtle tick as the sticker starts peeling off the sheet
     }
   }
@@ -408,6 +413,7 @@ PeelIt.Game = (function () {
   function onPointerUp() {
     if (!activeDrag) return;
     PeelIt.Audio.stopCrinkle();
+    PeelIt.Audio.duckMusic(false); // ease the music back up after the peel
     var dragged = activeDrag;
     activeDrag = null;
     parallax.x = 0; parallax.y = 0;
