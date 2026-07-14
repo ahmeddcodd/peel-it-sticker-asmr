@@ -142,10 +142,17 @@ PeelIt.Game = (function () {
     requestAnimationFrame(tick);
 
     PeelIt.SDK.init(function () {
+      // Signal game_ready as soon as the bridge is up. The menu is ALREADY
+      // rendered and interactive at this point (see the fast-first-paint note
+      // above), so this genuinely is the first playable frame. It must NOT wait
+      // on Save.load() - storage can stall for seconds (there's a 4s timeout on
+      // it), and gating game_ready behind that is what previously left
+      // moderation staring at a "waiting for Game Ready" screen.
+      PeelIt.SDK.gameReady();
+
       PeelIt.Save.load(function () {
         PeelIt.Audio.setMuted(PeelIt.Save.get().muted);
         updateMuteBtn();
-        PeelIt.SDK.gameReady();
         buildLevelGrid(); // refresh now that real unlock/stars are known
       });
     });
@@ -237,6 +244,9 @@ PeelIt.Game = (function () {
 
   // ---- level select screen ------------------------------------------------
   function showLevelSelect() {
+    // Bailing out of a level mid-play still ends the active-play period.
+    // (On level completion, triggerLevelComplete already sent this.)
+    if (gameState === 'playing') PeelIt.SDK.gameplayStopped();
     gameState = 'select';
     el.selectScreen.classList.add('visible');
     el.completeScreen.classList.remove('visible');
@@ -366,6 +376,7 @@ PeelIt.Game = (function () {
     updateRefThumb();
 
     PeelIt.SDK.levelStarted(currentLevel.id);
+    PeelIt.SDK.gameplayStarted(); // active play begins (Poki/CrazyGames need this)
   }
 
   // Re-run on level start AND after every successful placement, so the slots
@@ -427,6 +438,7 @@ PeelIt.Game = (function () {
 
   // ---- input --------------------------------------------------------------
   function onPointerDown(e) {
+    if (paused) return; // an ad is on screen - gameplay is frozen
     PeelIt.Audio.resume();
     if (gameState !== 'playing') return;
     if (activeDrag) return;
@@ -555,6 +567,27 @@ PeelIt.Game = (function () {
     if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) { /* unsupported */ } }
   }
 
+  // ---- ad / platform pause --------------------------------------------
+  // Playgama requires gameplay (not just sound) to be paused while a
+  // full-screen ad is on screen, and the game state preserved afterwards.
+  // update() bails while paused, so the board freezes exactly as it was;
+  // render() still runs, so the last frame stays on screen. Called by
+  // sdk.js around every ad, and idempotent so a duplicate platform
+  // pause event is harmless.
+  var paused = false;
+  function setPaused(value) {
+    value = !!value;
+    if (value === paused) return;
+    paused = value;
+    if (paused && activeDrag) {
+      // Don't strand a half-peeled sticker under the ad overlay - send it home
+      // (state is preserved; the player just re-grabs it afterwards).
+      PeelIt.Audio.stopCrinkle();
+      activeDrag.returnToTray(false);
+      activeDrag = null;
+    }
+  }
+
   // ---- floating reward labels (game feel) ------------------------------
   function addPopup(text, x, y, color) {
     popups.push({ text: text, x: x, y: y, t: 0, life: 1.0, color: color || '#fff' });
@@ -610,6 +643,7 @@ PeelIt.Game = (function () {
     PeelIt.Save.setStars(currentLevel.id, stars);
     PeelIt.Save.unlockNext(Math.min(currentLevelIndex + 1, PeelIt.Levels.count() - 1));
     PeelIt.SDK.levelComplete(currentLevel.id);
+    PeelIt.SDK.gameplayStopped(); // active play ends here (before any ad)
     levelsCompletedCount++;
 
     PeelIt.Audio.playSceneComplete();
@@ -688,21 +722,26 @@ PeelIt.Game = (function () {
   // placed stickers so the payoff is visible immediately.
   function onFoilBtnClick() {
     if (PeelIt.Save.hasFoil(currentLevel.id) || el.foilBtn.disabled) return;
-    el.foilBtn.disabled = true;
-    PeelIt.SDK.showRewardedAd(function () {
-      PeelIt.Save.setFoil(currentLevel.id);
-      stickers.forEach(function (s) { s.foil = true; });
-      PeelIt.Audio.playChime(4);
-      for (var i = 0; i < 8; i++) {
-        PeelIt.Particles.sparkle(
-          SCENE_RECT.x + Math.random() * SCENE_RECT.w,
-          SCENE_RECT.y + Math.random() * SCENE_RECT.h,
-          '#FFD700'
-        );
-      }
-      updateFoilBtn();
-    }, function () {
-      el.foilBtn.disabled = false;
+    // Playgama requires the call-to-action to state plainly that an ad will
+    // play AND name the reward before the ad starts - the AD badge plus this
+    // explicit opt-in dialog cover both.
+    showConfirm('Watch a short ad to unlock the foil pack?', function () {
+      el.foilBtn.disabled = true;
+      PeelIt.SDK.showRewardedAd(PeelIt.SDK.PLACEMENTS.foil, function () {
+        PeelIt.Save.setFoil(currentLevel.id);
+        stickers.forEach(function (s) { s.foil = true; });
+        PeelIt.Audio.playChime(4);
+        for (var i = 0; i < 8; i++) {
+          PeelIt.Particles.sparkle(
+            SCENE_RECT.x + Math.random() * SCENE_RECT.w,
+            SCENE_RECT.y + Math.random() * SCENE_RECT.h,
+            '#FFD700'
+          );
+        }
+        updateFoilBtn();
+      }, function () {
+        el.foilBtn.disabled = false;
+      });
     });
   }
 
@@ -736,7 +775,7 @@ PeelIt.Game = (function () {
     }
     showConfirm('Watch a short ad to reveal the next piece?', function () {
       el.hintBtn.disabled = true;
-      PeelIt.SDK.showRewardedAd(function () {
+      PeelIt.SDK.showRewardedAd(PeelIt.SDK.PLACEMENTS.hint, function () {
         adHintActive = true;
         el.hintBtn.disabled = false;
       }, function () {
@@ -770,6 +809,9 @@ PeelIt.Game = (function () {
   }
 
   function update(dt) {
+    // Gameplay is frozen while a full-screen ad is up (Playgama requirement).
+    // render() keeps drawing the last frame, so state is preserved intact.
+    if (paused) return;
     if (gameState === 'playing' || gameState === 'complete') {
       stickers.forEach(function (s) { if (s !== activeDrag) s.update(dt, time); });
     }
@@ -1124,6 +1166,7 @@ PeelIt.Game = (function () {
   function debugState() {
     return {
       gameState: gameState,
+      paused: paused,
       currentLevelIndex: currentLevelIndex,
       placedCount: placedCount,
       levelsCompletedCount: levelsCompletedCount,
@@ -1149,7 +1192,7 @@ PeelIt.Game = (function () {
     render();
   }
 
-  return { init: init, _debug: debugState, _renderOnce: renderOnce };
+  return { init: init, setPaused: setPaused, _debug: debugState, _renderOnce: renderOnce };
 })();
 
 document.addEventListener('DOMContentLoaded', PeelIt.Game.init);

@@ -52,17 +52,28 @@ PeelIt.SDK = (function () {
       callback(data);
     },
     gameReady: function () { /* no-op: nothing to report to on plain web */ },
+    gameplayStarted: function () { /* no-op */ },
+    gameplayStopped: function () { /* no-op */ },
     levelStarted: function () { /* no-op */ },
     levelComplete: function () { /* no-op */ },
-    showRewardedAd: function (onReward) {
-      // No ad network here. Simulate a short "ad" delay so the foil-pack
-      // reward flow can still be built and demoed end-to-end.
-      window.setTimeout(function () { onReward && onReward(); }, 400);
+    showRewardedAd: function (placement, onReward) {
+      // No ad network here. Simulate a short "ad" delay (with the same
+      // pause/resume the real thing does) so the reward flows can be built and
+      // demoed end-to-end locally.
+      adBreakBegin();
+      window.setTimeout(function () {
+        adBreakEnd();
+        onReward && onReward();
+      }, 400);
     },
     showInterstitialAd: function (onClosed) {
-      // No ad network here. Just call back immediately so the level-to-
-      // level flow (see game.js) isn't blocked during local testing.
-      window.setTimeout(function () { onClosed && onClosed(); }, 100);
+      // No ad network here. Just call back quickly so the level-to-level flow
+      // (see game.js) isn't blocked during local testing.
+      adBreakBegin();
+      window.setTimeout(function () {
+        adBreakEnd();
+        onClosed && onClosed();
+      }, 100);
     }
   };
 
@@ -94,12 +105,14 @@ PeelIt.SDK = (function () {
     levelComplete: function (levelId) {
       // TODO: window.ytgame.stats && window.ytgame.stats.reportMilestone(levelId);
     },
-    showRewardedAd: function (onReward, onFail) {
+    gameplayStarted: function () { /* TODO: wire to this platform if it has one */ },
+    gameplayStopped: function () { /* TODO: wire to this platform if it has one */ },
+    showRewardedAd: function (placement, onReward, onFail) {
       // TODO:
       // window.ytgame.getAdInstance().requestRewardedAd({
       //   onSuccess: onReward, onFail: onFail
       // });
-      webAdapter.showRewardedAd(onReward, onFail);
+      webAdapter.showRewardedAd(placement, onReward, onFail);
     },
     showInterstitialAd: function (onClosed) {
       // TODO: wire to the real interstitial call for this platform.
@@ -135,12 +148,14 @@ PeelIt.SDK = (function () {
     levelComplete: function () {
       // TODO: call PokiSDK.gameplayStop() here.
     },
-    showRewardedAd: function (onReward, onFail) {
+    gameplayStarted: function () { /* TODO: PokiSDK.gameplayStart() */ },
+    gameplayStopped: function () { /* TODO: PokiSDK.gameplayStop() */ },
+    showRewardedAd: function (placement, onReward, onFail) {
       // TODO:
       // window.PokiSDK.rewardedBreak().then(function (success) {
       //   success ? (onReward && onReward()) : (onFail && onFail());
       // });
-      webAdapter.showRewardedAd(onReward, onFail);
+      webAdapter.showRewardedAd(placement, onReward, onFail);
     },
     showInterstitialAd: function (onClosed) {
       // TODO: wire to the real interstitial call for this platform.
@@ -229,11 +244,45 @@ PeelIt.SDK = (function () {
   //     (assumed below; guarded with a feature check either way).
   //
   // Must match the placement ids declared in playgama-bridge-config.json.
-  var REWARDED_PLACEMENT = 'rewarded_foil_pack';
+  // Each rewarded PLACEMENT is distinct so the two very different rewards
+  // (cosmetic foil pack vs. a placement hint) are attributed separately -
+  // previously both fired under 'rewarded_foil_pack', which mis-reported every
+  // hint impression as a foil-pack one.
+  var PLACEMENTS = {
+    foil: 'rewarded_foil_pack',
+    hint: 'rewarded_hint'
+  };
   var INTERSTITIAL_PLACEMENT = 'interstitial_level_transition';
-  var REWARDED_STATE_EVENT = window.bridge && window.bridge.EVENT_NAME
-    ? window.bridge.EVENT_NAME.REWARDED_STATE_CHANGED
-    : 'rewarded_state_changed';
+
+  // Read the event-name constants lazily: bridge.EVENT_NAME may not be
+  // populated at module-eval time on every host.
+  function rewardedStateEvent() {
+    return (window.bridge && window.bridge.EVENT_NAME && window.bridge.EVENT_NAME.REWARDED_STATE_CHANGED)
+      || 'rewarded_state_changed';
+  }
+  function interstitialStateEvent() {
+    return (window.bridge && window.bridge.EVENT_NAME && window.bridge.EVENT_NAME.INTERSTITIAL_STATE_CHANGED)
+      || 'interstitial_state_changed';
+  }
+  // PLATFORM_MESSAGE constants, with the literal string as a fallback.
+  function msg(name, literal) {
+    return (window.bridge && window.bridge.PLATFORM_MESSAGE && window.bridge.PLATFORM_MESSAGE[name]) || literal;
+  }
+
+  // Playgama's advertising requirements are explicit: "When showing full-screen
+  // ads (interstitial or rewarded video), the game sound and gameplay must be
+  // paused." We subscribe to the platform's own PAUSE/AUDIO events too (see
+  // subscribeToPlatformAudioPause), but those are not relayed by every platform
+  // behind the bridge - so we ALSO pause explicitly around every ad call. Both
+  // paths are idempotent, so a double pause/resume is harmless.
+  function adBreakBegin() {
+    try { PeelIt.Audio.pauseForAd(); } catch (e) { /* audio not ready */ }
+    try { if (PeelIt.Game && PeelIt.Game.setPaused) PeelIt.Game.setPaused(true); } catch (e) { /* not booted */ }
+  }
+  function adBreakEnd() {
+    try { PeelIt.Audio.resumeAfterAd(); } catch (e) { /* audio not ready */ }
+    try { if (PeelIt.Game && PeelIt.Game.setPaused) PeelIt.Game.setPaused(false); } catch (e) { /* not booted */ }
+  }
 
   var playgamaAdapter = (function () {
     // Defensive wrapper for every direct window.bridge.* access below. A
@@ -415,81 +464,104 @@ PeelIt.SDK = (function () {
       },
       gameReady: function () {
         safeCall(function () {
-          window.bridge.platform.sendMessage('game_ready').catch(function (err) {
+          window.bridge.platform.sendMessage(msg('GAME_READY', 'game_ready')).catch(function (err) {
             console.warn('[SDK:playgama] game_ready message failed', err);
           });
         });
       },
+      // gameplay_started / gameplay_stopped bracket every period of ACTIVE play.
+      // Bridge is a unified layer over Poki / CrazyGames / etc., whose native
+      // SDKs require an explicit gameplayStart/gameplayStop signal - without
+      // these, those platforms never learn the player is actually playing.
+      gameplayStarted: function () {
+        safeCall(function () {
+          window.bridge.platform.sendMessage(msg('GAMEPLAY_STARTED', 'gameplay_started')).catch(function () {});
+        });
+      },
+      gameplayStopped: function () {
+        safeCall(function () {
+          window.bridge.platform.sendMessage(msg('GAMEPLAY_STOPPED', 'gameplay_stopped')).catch(function () {});
+        });
+      },
       levelStarted: function (levelId) {
         safeCall(function () {
-          window.bridge.platform.sendMessage('level_started', { level: String(levelId) }).catch(function () {});
+          window.bridge.platform.sendMessage(msg('LEVEL_STARTED', 'level_started'), { level: String(levelId) }).catch(function () {});
         });
       },
       levelComplete: function (levelId) {
         safeCall(function () {
-          window.bridge.platform.sendMessage('level_completed', { level: String(levelId) }).catch(function () {});
+          window.bridge.platform.sendMessage(msg('LEVEL_COMPLETED', 'level_completed'), { level: String(levelId) }).catch(function () {});
         });
       },
-      showRewardedAd: function (onReward, onFail) {
-        if (!window.bridge.advertisement) { webAdapter.showRewardedAd(onReward, onFail); return; }
+      showRewardedAd: function (placement, onReward, onFail) {
+        var ad = window.bridge.advertisement;
+        if (!ad || ad.isRewardedSupported === false) {
+          webAdapter.showRewardedAd(placement, onReward, onFail);
+          return;
+        }
         var rewarded = false;
         var settled = false;
-        // Reward ONLY on 'rewarded', never on 'closed' - see doc note above.
-        // Muting/pausing is NOT duplicated here - the platform's own
-        // AUDIO_STATE_CHANGED/PAUSE_STATE_CHANGED subscription (see
-        // subscribeToPlatformAudioPause above) is Playgama's explicitly
-        // documented single source of truth for that, covering every ad
-        // type uniformly. Unsubscribes on the terminal state so repeated
-        // ad calls don't accumulate stale listeners (assumes a symmetric
-        // .off() exists - still not confirmed, guarded with a feature check).
+        var EV = rewardedStateEvent();
+
+        // Requirement: sound + gameplay must be paused for a full-screen ad.
+        adBreakBegin();
+
+        var finish = function () {
+          settled = true;
+          if (ad.off) safeCall(function () { ad.off(EV, handleStateChange); });
+          adBreakEnd();
+        };
+        // Reward ONLY on 'rewarded', never on 'closed' - closing early must not
+        // grant the reward.
         var handleStateChange = function (state) {
           if (state === 'rewarded') {
             rewarded = true;
             onReward && onReward();
           } else if (state === 'closed' || state === 'failed') {
-            settled = true;
-            if (window.bridge.advertisement.off) {
-              safeCall(function () { window.bridge.advertisement.off(REWARDED_STATE_EVENT, handleStateChange); });
-            }
+            finish();
             if (!rewarded && state === 'failed') onFail && onFail();
           }
         };
         var ok = safeCall(function () {
-          window.bridge.advertisement.on(REWARDED_STATE_EVENT, handleStateChange);
-          window.bridge.advertisement.showRewarded(REWARDED_PLACEMENT);
+          ad.on(EV, handleStateChange);
+          ad.showRewarded(placement);
         });
-        // A synchronous throw here means the player tapped "unlock foil
-        // pack" and nothing happens - fall back rather than leave the UI
-        // stuck waiting forever.
-        if (!ok && !settled) webAdapter.showRewardedAd(onReward, onFail);
+        // A synchronous throw means the player tapped the button and nothing
+        // happens - unpause and fall back rather than strand the UI forever.
+        if (!ok && !settled) {
+          adBreakEnd();
+          webAdapter.showRewardedAd(placement, onReward, onFail);
+        }
       },
       showInterstitialAd: function (onClosed) {
-        if (!window.bridge.advertisement || !window.bridge.advertisement.isInterstitialSupported) {
+        var ad = window.bridge.advertisement;
+        if (!ad || !ad.isInterstitialSupported) {
           webAdapter.showInterstitialAd(onClosed);
           return;
         }
         var settled = false;
-        // Muting/pausing during the ad is handled entirely by the platform
-        // event subscription above - see the comment in showRewardedAd.
+        var EV = interstitialStateEvent();
+
+        adBreakBegin(); // sound + gameplay paused for the full-screen ad
+
         var handleStateChange = function (state) {
           if (state === 'closed' || state === 'failed') {
             settled = true;
-            if (window.bridge.advertisement.off) {
-              safeCall(function () {
-                window.bridge.advertisement.off(window.bridge.EVENT_NAME.INTERSTITIAL_STATE_CHANGED, handleStateChange);
-              });
-            }
+            if (ad.off) safeCall(function () { ad.off(EV, handleStateChange); });
+            adBreakEnd();
             onClosed && onClosed();
           }
         };
         var ok = safeCall(function () {
-          window.bridge.advertisement.on(window.bridge.EVENT_NAME.INTERSTITIAL_STATE_CHANGED, handleStateChange);
-          window.bridge.advertisement.showInterstitial(INTERSTITIAL_PLACEMENT);
+          ad.on(EV, handleStateChange);
+          ad.showInterstitial(INTERSTITIAL_PLACEMENT);
         });
-        // A synchronous throw here would otherwise strand the player on
-        // the complete screen forever (see maybeShowInterstitialThen in
-        // game.js, which awaits this callback before navigating on).
-        if (!ok && !settled) webAdapter.showInterstitialAd(onClosed);
+        // A synchronous throw would otherwise strand the player on the complete
+        // screen forever (maybeShowInterstitialThen awaits this callback).
+        if (!ok && !settled) {
+          adBreakEnd();
+          webAdapter.showInterstitialAd(onClosed);
+        }
       }
     };
   })();
@@ -511,11 +583,16 @@ PeelIt.SDK = (function () {
     saveData: function (obj) { return active.saveData(obj); },
     loadData: function (callback) { active.loadData(callback); },
     gameReady: function () { active.gameReady(); },
+    gameplayStarted: function () { active.gameplayStarted(); },
+    gameplayStopped: function () { active.gameplayStopped(); },
     levelStarted: function (levelId) { active.levelStarted(levelId); },
     levelComplete: function (levelId) { active.levelComplete(levelId); },
-    showRewardedAd: function (onReward, onFail) { active.showRewardedAd(onReward, onFail); },
+    // placement is one of PeelIt.SDK.PLACEMENTS (foil / hint) so the two
+    // rewarded rewards are reported separately.
+    showRewardedAd: function (placement, onReward, onFail) { active.showRewardedAd(placement, onReward, onFail); },
     showInterstitialAd: function (onClosed) { active.showInterstitialAd(onClosed); },
     getLanguage: function () { return active.getLanguage(); },
+    PLACEMENTS: PLACEMENTS,
     platform: active.id
   };
 })();
