@@ -17,6 +17,16 @@ PeelIt.Save = (function () {
 
   var state = null;
 
+  // Initialize to defaults synchronously at module load so the menu can render
+  // (buildLevelGrid reads Save.get()) on the very first frame - before the
+  // async platform load() has resolved. load() overwrites this with the real
+  // saved progress a moment later; see the "fast first paint" note in game.js.
+  function applyDefaults() {
+    state = Object.assign({}, DEFAULT_STATE);
+    state.stars = Object.assign({}, DEFAULT_STATE.stars);
+    state.foil = Object.assign({}, DEFAULT_STATE.foil);
+  }
+
   function applyLoaded(loaded) {
     state = Object.assign({}, DEFAULT_STATE, loaded || {});
     // Merge nested dicts explicitly so a partial/old save can't wipe fields.
@@ -127,6 +137,8 @@ PeelIt.Save = (function () {
     state.seenHint = true;
     persist();
   }
+
+  applyDefaults(); // ensure get() never returns null, even pre-load
 
   return {
     load: load,

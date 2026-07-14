@@ -1,12 +1,17 @@
 {
   "name": "peel-it-sticker-asmr",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "A satisfying ASMR sticker-peeling hypercasual game. Zero dependencies, zero assets - all art is canvas vector paths, all audio is procedural Web Audio.",
+  "type": "module",
+  "description": "A satisfying ASMR sticker peel-and-place hypercasual game. Curated canvas vector art, procedural Web Audio, bundled with Vite for Playgama.",
   "scripts": {
-    "dev": "npx --yes serve . --listen 8000",
-    "start": "npx --yes serve . --listen 8000"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 8000"
   },
-  "keywords": ["game", "html5", "canvas", "asmr", "hypercasual", "playgama"],
-  "license": "UNLICENSED"
+  "keywords": ["game", "html5", "canvas", "asmr", "hypercasual", "playgama", "vite"],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "vite": "^5.4.11"
+  }
 }

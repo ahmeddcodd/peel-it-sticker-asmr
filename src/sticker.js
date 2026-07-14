@@ -61,16 +61,23 @@ PeelIt.Sticker = (function () {
     draw: function (ctx, size, color) {
       var s = size / 200;
       this.outline(ctx, size);
-      ctx.fillStyle = alpha('#ffffff', 0.5);
+      // Solid cream fill (was translucent white, which vanished against the
+      // pastel background and made the whole cup look invisible - the boba
+      // level then read as scattered pieces). A soft vertical gradient keeps
+      // the "cup" feel while staying clearly visible.
+      var grad = ctx.createLinearGradient(0, -70 * s, 0, 70 * s);
+      grad.addColorStop(0, shade(color, 12));
+      grad.addColorStop(1, shade(color, -8));
+      ctx.fillStyle = grad;
       ctx.fill();
-      ctx.strokeStyle = shade(color, -40);
+      ctx.strokeStyle = shade(color, -45);
       ctx.lineWidth = 5 * s;
       ctx.stroke();
       // rim
       ctx.beginPath();
       ctx.moveTo(-62 * s, -70 * s);
       ctx.lineTo(62 * s, -70 * s);
-      ctx.strokeStyle = shade(color, -20);
+      ctx.strokeStyle = shade(color, -25);
       ctx.lineWidth = 6 * s;
       ctx.lineCap = 'round';
       ctx.stroke();
@@ -1056,20 +1063,25 @@ PeelIt.Sticker = (function () {
     draw: function (ctx, size, color) {
       var s = size / 200;
       this.outline(ctx, size);
-      ctx.fillStyle = alpha('#ffffff', 0.4);
+      // Light blue-tinted "glass" fill (was near-invisible translucent white).
+      var grad = ctx.createLinearGradient(-50 * s, 0, 50 * s, 0);
+      grad.addColorStop(0, alpha('#cfe0f2', 0.9));
+      grad.addColorStop(0.5, alpha('#eef5fc', 0.95));
+      grad.addColorStop(1, alpha('#cfe0f2', 0.9));
+      ctx.fillStyle = grad;
       ctx.fill();
-      ctx.strokeStyle = shade(color, -20);
+      ctx.strokeStyle = '#9db6d4';
       ctx.lineWidth = 3 * s;
       ctx.stroke();
       ctx.beginPath();
       ctx.rect(-6 * s, 60 * s, 12 * s, 20 * s);
-      ctx.fillStyle = alpha('#ffffff', 0.5);
+      ctx.fillStyle = alpha('#dbe7f5', 0.95);
       ctx.fill();
       ctx.beginPath();
       ctx.ellipse(0, 80 * s, 26 * s, 7 * s, 0, 0, Math.PI * 2);
-      ctx.fillStyle = alpha('#ffffff', 0.5);
+      ctx.fillStyle = alpha('#dbe7f5', 0.95);
       ctx.fill();
-      ctx.strokeStyle = shade(color, -20);
+      ctx.strokeStyle = '#9db6d4';
       ctx.lineWidth = 2 * s;
       ctx.stroke();
     }
@@ -1391,9 +1403,11 @@ PeelIt.Sticker = (function () {
     draw: function (ctx, size, color) {
       var s = size / 200;
       this.outline(ctx, size);
-      ctx.fillStyle = alpha('#ffffff', 0.35);
+      // Light aqua glass fill (was near-invisible translucent white, leaving
+      // the aquarium looking empty).
+      ctx.fillStyle = alpha('#d6eefb', 0.85);
       ctx.fill();
-      ctx.strokeStyle = shade(color, -25);
+      ctx.strokeStyle = '#7fb4d8';
       ctx.lineWidth = 6 * s;
       ctx.stroke();
       // glassy diagonal highlight
@@ -1548,7 +1562,10 @@ PeelIt.Sticker = (function () {
   }
 
   Sticker.prototype.snapRadius = function () {
-    return this.size * 0.42;
+    // Forgiving snap zone: placement should feel like the slot magnetically
+    // accepts the piece, not like a pixel-perfect drop test. Star rating
+    // still rewards accuracy (dropDistance / snapRadius, tuned in game.js).
+    return this.size * 0.5;
   };
 
   Sticker.prototype.update = function (dt, time) {
@@ -1682,7 +1699,7 @@ PeelIt.Sticker = (function () {
     var shape = SHAPES[this.shape];
     if (!shape) return;
     var dpr = window.devicePixelRatio || 1;
-    var cacheSize = Math.ceil(this.size * 1.4);
+    var cacheSize = Math.ceil(this.size * 1.7); // extra room for the soft shadow
     var canvas = document.createElement('canvas');
     canvas.width = Math.ceil(cacheSize * dpr);
     canvas.height = Math.ceil(cacheSize * dpr);
@@ -1690,6 +1707,18 @@ PeelIt.Sticker = (function () {
     cctx.scale(dpr, dpr);
     cctx.translate(cacheSize / 2, cacheSize / 2);
     cctx.rotate(this.targetRot);
+    // Bake a soft contact shadow once, so every placed piece reads as a real
+    // die-cut sticker resting on the page (curated depth) rather than a flat
+    // vector fill - a big part of why the assembled picture now looks
+    // intentional instead of "generated". First pass casts the shadow, second
+    // redraws the art cleanly on top so only the soft edge shows.
+    cctx.save();
+    cctx.shadowColor = 'rgba(60,45,75,0.30)';
+    cctx.shadowBlur = Math.max(4, this.size * 0.075);
+    cctx.shadowOffsetX = 0;
+    cctx.shadowOffsetY = Math.max(2, this.size * 0.05);
+    shape.draw(cctx, this.size, this.color);
+    cctx.restore();
     shape.draw(cctx, this.size, this.color);
     this.cachedCanvas = canvas;
     this.cachedCanvasSize = cacheSize;

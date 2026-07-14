@@ -30,12 +30,12 @@ PeelIt.Levels = (function () {
       name: 'Boba tea',
       bg: { top: '#FFEBF2', bottom: '#FFB8D2', accent: '#FF6FA3' },
       stickers: [
-        { id: 'cup', shape: 'boba-cup', color: '#FCEEDD', size: 190, z: 0, tx: 0.5, ty: 0.52, rot: 0 },
-        { id: 'liquid', shape: 'boba-liquid', color: '#C68A55', size: 150, z: 1, tx: 0.5, ty: 0.58, rot: 0 },
-        { id: 'pearls', shape: 'boba-pearls', color: '#4B2E1E', size: 120, z: 2, tx: 0.5, ty: 0.74, rot: 0 },
-        { id: 'straw', shape: 'boba-straw', color: '#FF8FB3', size: 150, z: 3, tx: 0.63, ty: 0.28, rot: 14 },
-        { id: 'lid', shape: 'boba-lid', color: '#FFFFFF', size: 150, z: 4, tx: 0.5, ty: 0.30, rot: 0 },
-        { id: 'face', shape: 'boba-face', color: '#7A4B2E', size: 110, z: 5, tx: 0.5, ty: 0.54, rot: 0 }
+        { id: 'cup', shape: 'boba-cup', color: '#FCEEDD', size: 190, z: 0, tx: 0.5, ty: 0.56, rot: 0 },
+        { id: 'liquid', shape: 'boba-liquid', color: '#C68A55', size: 150, z: 1, tx: 0.5, ty: 0.585, rot: 0 },
+        { id: 'pearls', shape: 'boba-pearls', color: '#4B2E1E', size: 120, z: 2, tx: 0.5, ty: 0.62, rot: 0 },
+        { id: 'straw', shape: 'boba-straw', color: '#FF8FB3', size: 150, z: 3, tx: 0.58, ty: 0.36, rot: 14 },
+        { id: 'lid', shape: 'boba-lid', color: '#EAF0F6', size: 150, z: 4, tx: 0.5, ty: 0.47, rot: 0 },
+        { id: 'face', shape: 'boba-face', color: '#7A4B2E', size: 110, z: 5, tx: 0.5, ty: 0.56, rot: 0 }
       ]
     },
     {
@@ -58,11 +58,11 @@ PeelIt.Levels = (function () {
       bg: { top: '#FFF3E0', bottom: '#FFC29E', accent: '#FF9466' },
       stickers: [
         { id: 'base', shape: 'cake-base', color: '#F293BE', size: 190, z: 0, tx: 0.5, ty: 0.60, rot: 0 },
-        { id: 'tier', shape: 'cake-tier', color: '#FDE1EC', size: 140, z: 1, tx: 0.5, ty: 0.44, rot: 0 },
-        { id: 'frosting', shape: 'cake-frosting', color: '#FFFFFF', size: 140, z: 2, tx: 0.5, ty: 0.35, rot: 0 },
-        { id: 'sprinkles', shape: 'cake-sprinkles', color: '#FF8FB3', size: 120, z: 3, tx: 0.5, ty: 0.50, rot: 0 },
-        { id: 'candle', shape: 'candle', color: '#FFFFFF', size: 90, z: 4, tx: 0.5, ty: 0.24, rot: 0 },
-        { id: 'flame', shape: 'candle-flame', color: '#FFB347', size: 50, z: 5, tx: 0.5, ty: 0.13, rot: 0 }
+        { id: 'tier', shape: 'cake-tier', color: '#FDE1EC', size: 150, z: 1, tx: 0.5, ty: 0.575, rot: 0 },
+        { id: 'frosting', shape: 'cake-frosting', color: '#FFF1F7', size: 150, z: 2, tx: 0.5, ty: 0.50, rot: 0 },
+        { id: 'sprinkles', shape: 'cake-sprinkles', color: '#FF8FB3', size: 120, z: 3, tx: 0.5, ty: 0.55, rot: 0 },
+        { id: 'candle', shape: 'candle', color: '#FBE2F0', size: 90, z: 4, tx: 0.5, ty: 0.46, rot: 0 },
+        { id: 'flame', shape: 'candle-flame', color: '#FFB347', size: 50, z: 5, tx: 0.5, ty: 0.405, rot: 0 }
       ]
     },
     {
@@ -75,7 +75,7 @@ PeelIt.Levels = (function () {
         { id: 'arc-outer', shape: 'rainbow-arc-outer', color: '#FF6F9E', size: 220, z: 2, tx: 0.5, ty: 0.55, rot: 0 },
         { id: 'arc-mid', shape: 'rainbow-arc-mid', color: '#FFC93D', size: 220, z: 3, tx: 0.5, ty: 0.55, rot: 0 },
         { id: 'arc-inner', shape: 'rainbow-arc-inner', color: '#5CC2FF', size: 220, z: 4, tx: 0.5, ty: 0.55, rot: 0 },
-        { id: 'sparkle', shape: 'stars-sparkle', color: '#FFFFFF', size: 150, z: 5, tx: 0.5, ty: 0.28, rot: 0 }
+        { id: 'sparkle', shape: 'stars-sparkle', color: '#FFD54A', size: 150, z: 5, tx: 0.5, ty: 0.28, rot: 0 }
       ]
     },
     {
@@ -83,12 +83,15 @@ PeelIt.Levels = (function () {
       name: 'Sneaker',
       bg: { top: '#FFF6E8', bottom: '#FFD8A8', accent: '#FF9F66' },
       stickers: [
-        { id: 'sole', shape: 'shoe-sole', color: '#F5F5F5', size: 200, z: 0, tx: 0.5, ty: 0.62, rot: -6 },
-        { id: 'body', shape: 'shoe-body', color: '#4FCC9E', size: 200, z: 1, tx: 0.5, ty: 0.50, rot: -6 },
-        { id: 'toe', shape: 'shoe-toe', color: '#FFFFFF', size: 150, z: 2, tx: 0.79, ty: 0.53, rot: -6 },
-        { id: 'laces', shape: 'shoe-laces', color: '#FFFFFF', size: 150, z: 3, tx: 0.40, ty: 0.42, rot: -6 },
-        { id: 'swoosh', shape: 'shoe-swoosh', color: '#FF8FB3', size: 170, z: 4, tx: 0.48, ty: 0.50, rot: -6 },
-        { id: 'heel-tab', shape: 'shoe-heel-tab', color: '#FF9F66', size: 200, z: 5, tx: 0.5, ty: 0.50, rot: -6 }
+        // These parts are all drawn with absolute offsets from one shared shoe
+        // origin, so they must share the same tx/ty to assemble into one shoe
+        // (the toe cap is the only free-floating piece and sits at the front).
+        { id: 'sole', shape: 'shoe-sole', color: '#EFEFEF', size: 200, z: 0, tx: 0.5, ty: 0.52, rot: -6 },
+        { id: 'body', shape: 'shoe-body', color: '#4FCC9E', size: 200, z: 1, tx: 0.5, ty: 0.52, rot: -6 },
+        { id: 'toe', shape: 'shoe-toe', color: '#FFFFFF', size: 150, z: 2, tx: 0.60, ty: 0.545, rot: -6 },
+        { id: 'laces', shape: 'shoe-laces', color: '#F0F0F0', size: 200, z: 3, tx: 0.5, ty: 0.52, rot: -6 },
+        { id: 'swoosh', shape: 'shoe-swoosh', color: '#FF8FB3', size: 200, z: 4, tx: 0.5, ty: 0.52, rot: -6 },
+        { id: 'heel-tab', shape: 'shoe-heel-tab', color: '#FF9F66', size: 200, z: 5, tx: 0.5, ty: 0.52, rot: -6 }
       ]
     },
     {
@@ -121,7 +124,7 @@ PeelIt.Levels = (function () {
       bg: { top: '#EDE7FF', bottom: '#B7A4FF', accent: '#8F6FFF' },
       stickers: [
         { id: 'body', shape: 'controller-body', color: '#6C56F0', size: 210, z: 0, tx: 0.5, ty: 0.52, rot: 0 },
-        { id: 'dpad', shape: 'dpad', color: '#FFFFFF', size: 150, z: 1, tx: 0.40, ty: 0.52, rot: 0 },
+        { id: 'dpad', shape: 'dpad', color: '#E4E4EC', size: 150, z: 1, tx: 0.40, ty: 0.52, rot: 0 },
         { id: 'buttons', shape: 'buttons', color: '#FF8FB3', size: 150, z: 2, tx: 0.60, ty: 0.52, rot: 0 },
         { id: 'joystick', shape: 'joystick', color: '#4A3B57', size: 100, z: 3, tx: 0.5, ty: 0.60, rot: 0 },
         { id: 'light', shape: 'controller-light', color: '#7CE0A0', size: 60, z: 4, tx: 0.5, ty: 0.40, rot: 0 },
@@ -133,12 +136,12 @@ PeelIt.Levels = (function () {
       name: 'Ice cream sundae',
       bg: { top: '#FFEEF5', bottom: '#FFB8D6', accent: '#FF7FAE' },
       stickers: [
-        { id: 'glass', shape: 'sundae-glass', color: '#FFFFFF', size: 190, z: 0, tx: 0.5, ty: 0.58, rot: 0 },
-        { id: 'scoop-bottom', shape: 'scoop', color: '#F293BE', size: 160, z: 1, tx: 0.5, ty: 0.42, rot: 0 },
-        { id: 'scoop-top', shape: 'scoop', color: '#FFE066', size: 130, z: 2, tx: 0.5, ty: 0.27, rot: 0 },
-        { id: 'drizzle', shape: 'syrup-drizzle', color: '#B5651D', size: 150, z: 3, tx: 0.5, ty: 0.30, rot: 0 },
-        { id: 'cherry', shape: 'cherry', color: '#E63950', size: 70, z: 4, tx: 0.5, ty: 0.15, rot: 0 },
-        { id: 'wafer', shape: 'wafer', color: '#E8B888', size: 110, z: 5, tx: 0.73, ty: 0.30, rot: 20 }
+        { id: 'glass', shape: 'sundae-glass', color: '#FFFFFF', size: 190, z: 0, tx: 0.5, ty: 0.60, rot: 0 },
+        { id: 'scoop-bottom', shape: 'scoop', color: '#F293BE', size: 165, z: 1, tx: 0.5, ty: 0.50, rot: 0 },
+        { id: 'scoop-top', shape: 'scoop', color: '#FFE066', size: 135, z: 2, tx: 0.5, ty: 0.41, rot: 0 },
+        { id: 'drizzle', shape: 'syrup-drizzle', color: '#B5651D', size: 150, z: 3, tx: 0.5, ty: 0.44, rot: 0 },
+        { id: 'cherry', shape: 'cherry', color: '#E63950', size: 70, z: 4, tx: 0.5, ty: 0.34, rot: 0 },
+        { id: 'wafer', shape: 'wafer', color: '#E8B888', size: 110, z: 5, tx: 0.68, ty: 0.44, rot: 20 }
       ]
     },
     {
@@ -150,8 +153,8 @@ PeelIt.Levels = (function () {
         { id: 'ring', shape: 'planet-ring', color: '#FFC93D', size: 190, z: 1, tx: 0.5, ty: 0.50, rot: 0 },
         { id: 'spots', shape: 'planet-spots', color: '#5A3FA8', size: 150, z: 2, tx: 0.5, ty: 0.50, rot: 0 },
         { id: 'moon', shape: 'moon-small', color: '#FFE066', size: 70, z: 3, tx: 0.78, ty: 0.28, rot: 0 },
-        { id: 'stars', shape: 'stars-sparkle', color: '#FFFFFF', size: 160, z: 4, tx: 0.5, ty: 0.16, rot: 0 },
-        { id: 'comet', shape: 'comet', color: '#FFFFFF', size: 140, z: 5, tx: 0.16, ty: 0.20, rot: -30 }
+        { id: 'stars', shape: 'stars-sparkle', color: '#FFE38A', size: 160, z: 4, tx: 0.5, ty: 0.16, rot: 0 },
+        { id: 'comet', shape: 'comet', color: '#BFE7FF', size: 140, z: 5, tx: 0.16, ty: 0.20, rot: -30 }
       ]
     },
     {
@@ -164,7 +167,7 @@ PeelIt.Levels = (function () {
         { id: 'wing-upper-left', shape: 'wing-upper-left', color: '#FF6FA3', size: 170, z: 2, tx: 0.5, ty: 0.52, rot: 0 },
         { id: 'wing-upper-right', shape: 'wing-upper-right', color: '#FF6FA3', size: 170, z: 3, tx: 0.5, ty: 0.52, rot: 0 },
         { id: 'body', shape: 'butterfly-body', color: '#5A4636', size: 90, z: 4, tx: 0.5, ty: 0.52, rot: 0 },
-        { id: 'pattern', shape: 'wing-pattern', color: '#FFFFFF', size: 170, z: 5, tx: 0.5, ty: 0.52, rot: 0 }
+        { id: 'pattern', shape: 'wing-pattern', color: '#FFE9A8', size: 170, z: 5, tx: 0.5, ty: 0.52, rot: 0 }
       ]
     },
     {
@@ -177,7 +180,7 @@ PeelIt.Levels = (function () {
         { id: 'seaweed', shape: 'seaweed', color: '#2E9B5C', size: 120, z: 2, tx: 0.30, ty: 0.68, rot: 0 },
         { id: 'fish-tail', shape: 'fish-tail', color: '#E8590C', size: 170, z: 3, tx: 0.55, ty: 0.48, rot: 0 },
         { id: 'fish-body', shape: 'fish-body', color: '#FFA94D', size: 130, z: 4, tx: 0.55, ty: 0.48, rot: 0 },
-        { id: 'bubbles', shape: 'bubbles', color: '#FFFFFF', size: 100, z: 5, tx: 0.68, ty: 0.30, rot: 0 }
+        { id: 'bubbles', shape: 'bubbles', color: '#AEDAF0', size: 100, z: 5, tx: 0.68, ty: 0.30, rot: 0 }
       ]
     }
   ];

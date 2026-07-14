@@ -63,7 +63,15 @@ html, body {
 #top-bar.visible { display: flex; }
 #top-bar > * { pointer-events: auto; }
 
-.top-bar-right { display: flex; gap: 0.5rem; }
+.top-bar-right { display: flex; gap: 0.5rem; align-items: center; }
+
+/* Top-bar reference: the picture you're currently building, always visible. */
+#ref-thumb {
+  width: 2.75rem; height: 2.75rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.16), inset 0 0 0 2px rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.6);
+}
 
 #level-name {
   color: var(--ink);
@@ -162,6 +170,9 @@ html, body {
   width: 100%;
   aspect-ratio: 1;
   border-radius: 0.875rem;
+  display: block;
+}
+.locked-thumb {
   display: flex; align-items: center; justify-content: center;
   font-size: 2.125rem;
 }
@@ -189,7 +200,13 @@ html, body {
   font-weight: 800;
 }
 .stars-row { display: flex; gap: 0.5rem; margin-bottom: 1.75rem; }
-.stars-row .star { font-size: 2.125rem; }
+.stars-row .star { font-size: 2.125rem; transition: color 0.15s; }
+.stars-row .star.pop { animation: star-pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes star-pop {
+  0% { transform: scale(0.3) rotate(-25deg); }
+  60% { transform: scale(1.35) rotate(8deg); }
+  100% { transform: scale(1) rotate(0); }
+}
 
 .button-row { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
 
@@ -238,3 +255,137 @@ html, body {
   text-decoration: underline;
   cursor: pointer;
 }
+
+/* ---- ad badge (rewarded-ad transparency, per Playgama ad policy) -------- */
+/* Makes it unmistakable that a control triggers a rewarded ad - the review
+   flagged the old hint button for hiding this. */
+.ad-badge {
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  color: #fff;
+  background: linear-gradient(135deg, #ff7a59, #ff477e);
+  border-radius: 0.375rem;
+  padding: 0.12rem 0.22rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+}
+.hint-btn { position: relative; overflow: visible; }
+.hint-btn .hint-glyph { font-size: 1.125rem; }
+#hint-badge {
+  position: absolute;
+  top: -0.28rem; right: -0.28rem;
+}
+/* Free hint available -> no AD badge (its absence signals "free"); once the
+   free hint is spent, the AD badge appears so the ad cost is unmistakable. */
+.hint-btn.free #hint-badge { display: none; }
+.ad-badge.on-pill { margin-left: 0.4rem; vertical-align: middle; }
+
+/* ---- header row (title + album / back chip) ---------------------------- */
+.select-head {
+  width: 100%;
+  max-width: 26.25rem;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+.select-titles { text-align: left; }
+.select-titles .subtitle { margin-bottom: 0; }
+.album-title { font-size: 1.75rem; }
+
+.chip-btn {
+  flex: none;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.8125rem;
+  padding: 0.5rem 0.9rem;
+  display: flex; align-items: center; gap: 0.35rem;
+  box-shadow: 0 4px 12px rgba(120,90,150,0.18);
+  cursor: pointer;
+}
+.chip-btn:active { transform: scale(0.95); }
+.chip-glyph { font-size: 1rem; }
+
+/* ---- sticker album ----------------------------------------------------- */
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 26.25rem;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.album-grid::-webkit-scrollbar { display: none; }
+
+.album-card {
+  border-radius: 1rem;
+  background: #fff;
+  padding: 0.5rem;
+  display: flex; flex-direction: column; align-items: center; gap: 0.3rem;
+  box-shadow: 0 5px 14px rgba(120,90,150,0.16);
+}
+.album-card.empty {
+  background: rgba(255,255,255,0.45);
+  box-shadow: inset 0 0 0 2px rgba(160,140,180,0.25);
+}
+.album-card.foil {
+  box-shadow: 0 5px 18px rgba(183,156,255,0.5), inset 0 0 0 2px rgba(255,220,150,0.7);
+}
+.album-thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 0.7rem;
+  display: block;
+}
+.album-name {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+.album-stars { display: flex; gap: 0.1rem; }
+.album-stars .star { font-size: 0.6875rem; }
+.album-locked {
+  width: 100%; aspect-ratio: 1;
+  border-radius: 0.7rem;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 2rem; font-weight: 800;
+  color: rgba(120,110,140,0.4);
+}
+
+/* ---- confirm dialog ---------------------------------------------------- */
+.confirm-overlay {
+  position: absolute; inset: 0;
+  display: none;
+  align-items: center; justify-content: center;
+  z-index: 20;
+  background: rgba(40,27,46,0.55);
+  backdrop-filter: blur(3px);
+  padding: 1.5rem;
+}
+.confirm-overlay.visible { display: flex; }
+.confirm-card {
+  background: #fff;
+  border-radius: 1.25rem;
+  padding: 1.5rem 1.5rem 1.25rem;
+  max-width: 20rem; width: 100%;
+  text-align: center;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+}
+.confirm-card p {
+  margin: 0 0 1.25rem;
+  color: var(--ink);
+  font-size: 1rem; font-weight: 600;
+  line-height: 1.4;
+}
+.confirm-card .button-row { margin-bottom: 0; justify-content: center; }

@@ -57,6 +57,8 @@ PeelIt.Game = (function () {
   var completePanelShown = false;
   var confettiPalette = ['#FF8FB3', '#FFD8A8', '#8FB3FF', '#B7F0C1', '#FFF3B0'];
   var levelsCompletedCount = 0; // drives the every-3rd-level interstitial cadence
+  var combo = 0;        // consecutive accurate placements (drives escalating reward)
+  var popups = [];      // floating "Perfect!" / "Combo xN" canvas labels
 
   // ---- DOM references ---------------------------------------------------
   var el = {};
@@ -78,6 +80,17 @@ PeelIt.Game = (function () {
     el.levelName = document.getElementById('level-name');
     el.backBtn = document.getElementById('back-btn');
     el.hintBtn = document.getElementById('hint-btn');
+    el.hintBadge = document.getElementById('hint-badge');
+    el.foilLabel = document.getElementById('foil-label');
+    el.foilBadge = document.getElementById('foil-badge');
+    el.refThumb = document.getElementById('ref-thumb');
+    el.albumBtn = document.getElementById('album-btn');
+    el.albumScreen = document.getElementById('screen-album');
+    el.albumBackBtn = document.getElementById('album-back-btn');
+    el.confirmOverlay = document.getElementById('confirm-overlay');
+    el.confirmText = document.getElementById('confirm-text');
+    el.confirmYes = document.getElementById('confirm-yes');
+    el.confirmNo = document.getElementById('confirm-no');
   }
 
   // ---- bootstrap ----------------------------------------------------------
@@ -87,36 +100,53 @@ PeelIt.Game = (function () {
     ctx = canvas.getContext('2d');
     frame = el.frame;
 
+    wireUi();
+    resize();
+    window.addEventListener('resize', resize);
+    window.addEventListener('orientationchange', resize);
+    // 'load' fires after the embedding viewport is definitely established -
+    // catches hosts that report a 0-size window on our first synchronous
+    // resize() (which would otherwise letterbox the game to nothing until
+    // some later event happened to fire).
+    window.addEventListener('load', resize);
+    // ResizeObserver as a second, independent detection path: some
+    // hosting/embedding techniques (e.g. a platform's own "scale test"
+    // resizing our iframe via a CSS transform, or certain iframe embeds
+    // generally) don't reliably fire a window 'resize' event inside our own
+    // document even though our visible box size changed - that leaves the
+    // frame letterboxed for a stale size, reading as "shifted or cropped".
+    // ResizeObserver watches the actual rendered box directly regardless of
+    // what triggered the change, so it fires in cases 'resize' can miss.
+    if (window.ResizeObserver) {
+      new ResizeObserver(resize).observe(document.body);
+    }
+    // Also recheck on visibility change: an iframe resized while
+    // backgrounded/hidden may not have dispatched anything we caught.
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) resize();
+    });
+    // Retry sizing over the next few ticks in case the very first
+    // measurement came back 0 (observed on some embedded/iframe hosts) -
+    // resize() is a no-op once already correctly sized.
+    requestAnimationFrame(resize);
+    setTimeout(resize, 60);
+    setTimeout(resize, 250);
+
+    // Fast first paint: show the menu and start the render loop IMMEDIATELY,
+    // running on safe default progress. Do NOT gate the first frame on the
+    // platform SDK handshake - bridge.initialize() can take up to its 3s
+    // timeout, and blocking on it is what made the game feel slow to load
+    // (a blank frame until the bridge answered). The real save fills in
+    // unlocked levels/stars a moment later and the grid refreshes then.
+    showLevelSelect();
+    requestAnimationFrame(tick);
+
     PeelIt.SDK.init(function () {
       PeelIt.Save.load(function () {
         PeelIt.Audio.setMuted(PeelIt.Save.get().muted);
         updateMuteBtn();
         PeelIt.SDK.gameReady();
-
-        wireUi();
-        resize();
-        window.addEventListener('resize', resize);
-        window.addEventListener('orientationchange', resize);
-        // ResizeObserver as a second, independent detection path: some
-        // hosting/embedding techniques (e.g. a platform's own "scale test"
-        // resizing our iframe via a CSS transform, or certain iframe
-        // embeds generally) don't reliably fire a window 'resize' event
-        // inside our own document even though our visible box size
-        // changed - that leaves the frame letterboxed for a stale size,
-        // reading as "shifted or cropped". ResizeObserver watches the
-        // actual rendered box directly regardless of what triggered the
-        // change, so it fires in cases 'resize' can miss.
-        if (window.ResizeObserver) {
-          new ResizeObserver(resize).observe(document.body);
-        }
-        // Also recheck on visibility change: an iframe resized while
-        // backgrounded/hidden may not have dispatched anything we caught.
-        document.addEventListener('visibilitychange', function () {
-          if (!document.hidden) resize();
-        });
-
-        showLevelSelect();
-        requestAnimationFrame(tick);
+        buildLevelGrid(); // refresh now that real unlock/stars are known
       });
     });
   }
@@ -141,6 +171,12 @@ PeelIt.Game = (function () {
     });
     el.foilBtn.addEventListener('click', onFoilBtnClick);
     el.hintBtn.addEventListener('click', onHintBtnClick);
+    el.albumBtn.addEventListener('click', showAlbum);
+    el.albumBackBtn.addEventListener('click', showLevelSelect);
+    el.confirmYes.addEventListener('click', function () {
+      var cb = pendingConfirm; hideConfirm(); if (cb) cb();
+    });
+    el.confirmNo.addEventListener('click', hideConfirm);
 
     canvas.addEventListener('pointerdown', onPointerDown);
     canvas.addEventListener('pointermove', onPointerMove);
@@ -167,7 +203,14 @@ PeelIt.Game = (function () {
   // with the canvas instead of staying visually fixed-size.
   var UI_REFERENCE_W = 400;
   function resize() {
-    var maxW = window.innerWidth, maxH = window.innerHeight;
+    // Prefer the documentElement's client box, falling back to window.inner*.
+    // Some embedded/iframe hosts momentarily report window.innerWidth/Height
+    // as 0 on the first measurement; sizing to that collapses the whole game
+    // to a 0x0 (blank) frame. Bail until a real, non-trivial size is known -
+    // one of the retry hooks in init() will call back once layout settles.
+    var maxW = window.innerWidth || document.documentElement.clientWidth || 0;
+    var maxH = window.innerHeight || document.documentElement.clientHeight || 0;
+    if (maxW < 2 || maxH < 2) return;
     var scale = Math.min(maxW / DESIGN_W, maxH / DESIGN_H);
     var cssW = Math.floor(DESIGN_W * scale);
     var cssH = Math.floor(DESIGN_H * scale);
@@ -197,8 +240,18 @@ PeelIt.Game = (function () {
     gameState = 'select';
     el.selectScreen.classList.add('visible');
     el.completeScreen.classList.remove('visible');
+    el.albumScreen.classList.remove('visible');
     el.topBar.classList.remove('visible');
     buildLevelGrid();
+  }
+
+  // The album is a full-screen DOM overlay on top of the idle canvas, so
+  // gameState stays 'select' (the canvas keeps painting its calm menu
+  // background behind it) - no new game state needed.
+  function showAlbum() {
+    PeelIt.Album.build();
+    el.selectScreen.classList.remove('visible');
+    el.albumScreen.classList.add('visible');
   }
 
   function buildLevelGrid() {
@@ -210,11 +263,20 @@ PeelIt.Game = (function () {
       card.className = 'level-card' + (locked ? ' locked' : '');
       card.disabled = locked;
 
-      var thumb = document.createElement('div');
-      thumb.className = 'level-thumb';
-      thumb.style.background = 'linear-gradient(160deg,' + lvl.bg.top + ',' + lvl.bg.bottom + ')';
-      thumb.textContent = locked ? '🔒' : levelEmoji(lvl.id);
-      card.appendChild(thumb);
+      if (locked) {
+        var thumb = document.createElement('div');
+        thumb.className = 'level-thumb locked-thumb';
+        thumb.style.background = 'linear-gradient(160deg,' + lvl.bg.top + ',' + lvl.bg.bottom + ')';
+        thumb.textContent = '🔒';
+        card.appendChild(thumb);
+      } else {
+        // Show the actual finished picture on the card, so players know what
+        // they're about to build (and see the curated art up front).
+        var thumbC = document.createElement('canvas');
+        thumbC.className = 'level-thumb';
+        card.appendChild(thumbC);
+        renderThumbCanvas(thumbC, lvl, 240, 22, PeelIt.Save.hasFoil(lvl.id));
+      }
 
       var label = document.createElement('div');
       label.className = 'level-label';
@@ -234,13 +296,23 @@ PeelIt.Game = (function () {
     });
   }
 
-  function levelEmoji(id) {
-    var map = {
-      'boba-tea': '🧋', 'smiling-cat': '🐱', 'birthday-cake': '🎂', 'rainbow': '🌈',
-      'sneaker': '👟', 'donut': '🍩', 'sunflower': '🌻', 'gaming-controller': '🎮',
-      'ice-cream-sundae': '🍨', 'planet': '🪐', 'butterfly': '🦋', 'aquarium': '🐠'
-    };
-    return map[id] || '✨';
+  // Render a level's finished picture into a square canvas (menu cards + the
+  // top-bar reference). Uses the shared solved-picture renderer so every
+  // thumbnail is a faithful miniature of the assembled art.
+  function renderThumbCanvas(canvas, level, px, radius, foil) {
+    var d = window.devicePixelRatio || 1;
+    canvas.width = px * d;
+    canvas.height = px * d;
+    var c = canvas.getContext('2d');
+    c.setTransform(d, 0, 0, d, 0, 0);
+    PeelIt.SceneRender.drawSolved(c, level, px, px, {
+      background: true, radius: radius, foil: !!foil
+    });
+  }
+
+  function updateRefThumb() {
+    if (!el.refThumb || !currentLevel) return;
+    renderThumbCanvas(el.refThumb, currentLevel, 132, 16, PeelIt.Save.hasFoil(currentLevel.id));
   }
 
   function makeStarSpan(filled) {
@@ -252,12 +324,21 @@ PeelIt.Game = (function () {
 
   // ---- level lifecycle ------------------------------------------------------
   function startLevel(index) {
+    // startLevel is always reached from a click handler (level card / replay /
+    // next), so we're inside a user gesture here - the right moment to unlock
+    // the AudioContext and bring up the ambient music bed (autoplay policies
+    // require a gesture; the DOM click that got us here counts).
+    PeelIt.Audio.resume();
+    PeelIt.Audio.startMusic();
+
     currentLevelIndex = index;
     currentLevel = PeelIt.Levels.get(index);
     placedCount = 0;
     activeDrag = null;
     completeT = 0;
     completePanelShown = false;
+    combo = 0;
+    popups.length = 0;
     parallax.x = 0; parallax.y = 0;
 
     stickers = currentLevel.stickers.map(function (def) {
@@ -274,12 +355,15 @@ PeelIt.Game = (function () {
 
     hintActive = (index === 0 && !PeelIt.Save.get().seenHint);
     adHintActive = false;
+    freeHintUsed = false;
+    updateHintBtn();
 
     gameState = 'playing';
     el.selectScreen.classList.remove('visible');
     el.completeScreen.classList.remove('visible');
     el.topBar.classList.add('visible');
     el.levelName.textContent = currentLevel.name;
+    updateRefThumb();
 
     PeelIt.SDK.levelStarted(currentLevel.id);
   }
@@ -370,6 +454,7 @@ PeelIt.Game = (function () {
       canvas.setPointerCapture(e.pointerId);
       activeDrag = best;
       best.startDrag(p.x, p.y);
+      best.peeledOff = false; // arm the "fully peeled" cue for this drag
       lastPointerPos = p;
       PeelIt.Audio.playLift();
       PeelIt.Audio.startCrinkle();
@@ -384,6 +469,15 @@ PeelIt.Game = (function () {
     var speed = activeDrag.dragTo(p.x, p.y, dt);
     var speed01 = Math.min(1, speed / 2500);
     PeelIt.Audio.updateCrinkle(speed01, dt);
+
+    // The instant the sticker fully lifts off the backing sheet: a soft airy
+    // pop + haptic tick makes peeling a discrete, satisfying beat (the game's
+    // signature ASMR moment) instead of an undifferentiated drag.
+    if (!activeDrag.peeledOff && activeDrag.peel >= 0.85) {
+      activeDrag.peeledOff = true;
+      PeelIt.Audio.playPeelRelease();
+      vibrate(12);
+    }
 
     parallax.x = ((p.x - DESIGN_W / 2) / DESIGN_W) * 10;
     parallax.y = ((p.y - SCENE_RECT.y - SCENE_RECT.h / 2) / SCENE_RECT.h) * 6;
@@ -412,12 +506,43 @@ PeelIt.Game = (function () {
       dragged.place();
       placedCount++;
       PeelIt.Audio.playThock();
-      PeelIt.Audio.playChime(placedCount - 1);
+
+      // Accuracy drives the reward: a near-dead-center drop is "perfect" and
+      // builds a combo (escalating chime + sparkles + label); a loose-but-valid
+      // drop still counts but resets the combo. This rewards deliberate,
+      // careful play - the hand-tuned game-feel the review asked for.
+      var acc = dragged.dropDistance / dragged.snapRadius(); // 0 = dead center
+      if (acc < 0.22) {
+        combo++;
+        PeelIt.Audio.playChime(Math.min(9, placedCount - 1 + combo));
+        PeelIt.Audio.playPerfect();
+        for (var i = 0; i < 7; i++) {
+          PeelIt.Particles.sparkle(
+            dragged.targetX + (Math.random() - 0.5) * dragged.size * 0.5,
+            dragged.targetY + (Math.random() - 0.5) * dragged.size * 0.5,
+            '#FFD54A'
+          );
+        }
+        addPopup(combo >= 2 ? 'Perfect x' + combo : 'Perfect!',
+          dragged.targetX, dragged.targetY - dragged.size * 0.55, '#FF9F1C');
+        vibrate([8, 18, 8]);
+      } else {
+        if (acc < 0.55) {
+          combo++;
+          if (combo >= 3) addPopup('Combo x' + combo,
+            dragged.targetX, dragged.targetY - dragged.size * 0.55, '#3DBE7A');
+        } else {
+          combo = 0;
+        }
+        PeelIt.Audio.playChime(placedCount - 1);
+        vibrate(15);
+      }
+
       PeelIt.Particles.burst(dragged.targetX, dragged.targetY, dragged.color);
-      vibrate(15);
       layoutTray();
       if (placedCount >= stickers.length) triggerLevelComplete();
     } else if (matches.length) {
+      combo = 0;
       dragged.returnToTray(true);
       PeelIt.Audio.playWrong();
       vibrate([10, 30, 10]);
@@ -428,6 +553,44 @@ PeelIt.Game = (function () {
 
   function vibrate(pattern) {
     if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) { /* unsupported */ } }
+  }
+
+  // ---- floating reward labels (game feel) ------------------------------
+  function addPopup(text, x, y, color) {
+    popups.push({ text: text, x: x, y: y, t: 0, life: 1.0, color: color || '#fff' });
+    if (popups.length > 10) popups.shift();
+  }
+
+  function updatePopups(dt) {
+    for (var i = popups.length - 1; i >= 0; i--) {
+      var p = popups[i];
+      p.t += dt;
+      p.y -= 34 * dt;
+      if (p.t >= p.life) popups.splice(i, 1);
+    }
+  }
+
+  function renderPopups() {
+    for (var i = 0; i < popups.length; i++) {
+      var p = popups[i];
+      var k = p.t / p.life;
+      var a = k < 0.18 ? k / 0.18 : 1 - (k - 0.18) / 0.82;
+      var pop = k < 0.18 ? 0.6 + 0.4 * (k / 0.18) : 1;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, a);
+      ctx.translate(p.x, p.y);
+      ctx.scale(pop, pop);
+      ctx.font = '800 46px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+      ctx.lineWidth = 7;
+      ctx.strokeText(p.text, 0, 0);
+      ctx.fillStyle = p.color;
+      ctx.fillText(p.text, 0, 0);
+      ctx.restore();
+    }
   }
 
   // ---- level complete -------------------------------------------------------
@@ -482,20 +645,38 @@ PeelIt.Game = (function () {
     completePanelShown = true;
     el.completeTitle.textContent = currentLevel.name + ' complete!';
     el.completeStars.innerHTML = '';
-    for (var i = 0; i < 3; i++) el.completeStars.appendChild(makeStarSpan(i < pendingStars));
+    var starEls = [];
+    for (var i = 0; i < 3; i++) {
+      var sp = makeStarSpan(false);
+      el.completeStars.appendChild(sp);
+      starEls.push(sp);
+    }
     var isLast = currentLevelIndex + 1 >= PeelIt.Levels.count();
     el.nextBtn.textContent = isLast ? 'See levels' : 'Next →';
     updateFoilBtn();
     el.completeScreen.classList.add('visible');
+
+    // Pop the earned stars in one at a time with an ascending chime - a small
+    // dopamine beat that makes the reward feel earned instead of instant.
+    for (var j = 0; j < pendingStars; j++) {
+      (function (idx) {
+        window.setTimeout(function () {
+          starEls[idx].classList.add('filled', 'pop');
+          PeelIt.Audio.playChime(idx + 3);
+        }, 260 + idx * 280);
+      })(j);
+    }
   }
 
   function updateFoilBtn() {
     if (PeelIt.Save.hasFoil(currentLevel.id)) {
-      el.foilBtn.textContent = '✨ Foil pack unlocked';
+      el.foilLabel.textContent = '✨ Foil pack unlocked';
+      el.foilBadge.style.display = 'none'; // no longer an ad cost
       el.foilBtn.classList.add('unlocked');
       el.foilBtn.disabled = true;
     } else {
-      el.foilBtn.textContent = '✨ Unlock foil pack';
+      el.foilLabel.textContent = '✨ Unlock foil pack';
+      el.foilBadge.style.display = '';
       el.foilBtn.classList.remove('unlocked');
       el.foilBtn.disabled = false;
     }
@@ -531,15 +712,49 @@ PeelIt.Game = (function () {
   // glow ring on the correct tray piece, pulsing destination outline, and
   // a looping ghost-hand demo. Dismissed the same way the tutorial is:
   // the moment the player actually grabs that sticker (see onPointerDown).
+  // One free hint per level; every hint after that is an OPT-IN rewarded ad
+  // with a clear confirm dialog first. This is the fix for the review's
+  // "hint button requires a reward, which is not obvious to players" - now
+  // the button carries an "AD" badge the moment it costs an ad, and never
+  // plays an ad without the player agreeing to it in the dialog.
+  var freeHintUsed = false;
+
+  function updateHintBtn() {
+    // Free hint available -> hide the AD badge; otherwise show it so the ad
+    // cost is unmistakable before the player taps.
+    if (freeHintUsed) el.hintBtn.classList.remove('free');
+    else el.hintBtn.classList.add('free');
+  }
+
   function onHintBtnClick() {
     if (gameState !== 'playing' || adHintActive || el.hintBtn.disabled) return;
-    el.hintBtn.disabled = true;
-    PeelIt.SDK.showRewardedAd(function () {
-      adHintActive = true;
-      el.hintBtn.disabled = false;
-    }, function () {
-      el.hintBtn.disabled = false;
+    if (!freeHintUsed) {
+      freeHintUsed = true;
+      updateHintBtn();
+      adHintActive = true; // reveal the hint immediately, no ad
+      return;
+    }
+    showConfirm('Watch a short ad to reveal the next piece?', function () {
+      el.hintBtn.disabled = true;
+      PeelIt.SDK.showRewardedAd(function () {
+        adHintActive = true;
+        el.hintBtn.disabled = false;
+      }, function () {
+        el.hintBtn.disabled = false;
+      });
     });
+  }
+
+  // ---- lightweight confirm dialog (rewarded-ad opt-in) -----------------
+  var pendingConfirm = null;
+  function showConfirm(text, onYes) {
+    el.confirmText.textContent = text;
+    pendingConfirm = onYes;
+    el.confirmOverlay.classList.add('visible');
+  }
+  function hideConfirm() {
+    el.confirmOverlay.classList.remove('visible');
+    pendingConfirm = null;
   }
 
   // ---- update / render loop ---------------------------------------------
@@ -559,6 +774,7 @@ PeelIt.Game = (function () {
       stickers.forEach(function (s) { if (s !== activeDrag) s.update(dt, time); });
     }
     PeelIt.Particles.update(dt);
+    updatePopups(dt);
 
     if (gameState === 'complete') {
       completeT += dt;
@@ -585,11 +801,13 @@ PeelIt.Game = (function () {
     ctx.translate(-DESIGN_W / 2, -DESIGN_H / 2);
 
     renderBackground();
+    renderGhostReference();
     renderSceneOutlines();
     renderPlacedStickers();
     renderTray();
     if (activeDrag) activeDrag.draw(ctx);
     if (hintActive || adHintActive) renderHint();
+    renderPopups();
 
     ctx.restore();
 
@@ -627,13 +845,55 @@ PeelIt.Game = (function () {
     ctx.restore();
   }
 
+  // Faint, full-color preview of every not-yet-placed piece at its final
+  // position, so the player always sees the picture they're building. This is
+  // the primary fix for the review's "pieces do not form the overall shape" -
+  // the old build showed only dashed outlines, giving no sense of the target
+  // image. The next-to-place piece (active z) reads a touch stronger to guide
+  // the eye; placed pieces are drawn solid on top by renderPlacedStickers().
+  function renderGhostReference() {
+    var activeZ = minUnplacedZ();
+    stickers.forEach(function (s) {
+      if (s.state === 'placed' || s.state === 'settling') return;
+      var shape = PeelIt.Sticker.SHAPES[s.shape];
+      if (!shape) return;
+      ctx.save();
+      ctx.globalAlpha = (s.z === activeZ) ? 0.2 : 0.09;
+      ctx.translate(s.targetX, s.targetY);
+      ctx.rotate(s.targetRot);
+      shape.draw(ctx, s.size, s.color);
+      ctx.restore();
+    });
+  }
+
   function renderSceneOutlines() {
     var activeZ = minUnplacedZ();
     stickers.forEach(function (s) {
       if (s.state === 'placed' || s.state === 'settling') return;
+      // Magnetic "you're close" cue: while the dragged piece is inside its snap
+      // zone, replace the dim dashed preview with a bright pulsing outline, so
+      // the slot reads as pulling the piece home.
+      if (s === activeDrag) {
+        var d = Math.hypot(s.x - s.targetX, s.y - s.targetY);
+        if (d <= s.snapRadius() * 1.25) { renderSnapGlow(s); return; }
+      }
       var dimmed = s.z !== activeZ;
       PeelIt.Sticker.drawOutline(ctx, s.shape, s.size, s.targetX, s.targetY, s.targetRot, dimmed);
     });
+  }
+
+  function renderSnapGlow(s) {
+    var shape = PeelIt.Sticker.SHAPES[s.shape];
+    if (!shape) return;
+    ctx.save();
+    ctx.translate(s.targetX, s.targetY);
+    ctx.rotate(s.targetRot);
+    shape.outline(ctx, s.size);
+    ctx.strokeStyle = 'rgba(255, 200, 87, ' + (0.7 + Math.sin(time * 8) * 0.2) + ')';
+    ctx.lineWidth = 5;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    ctx.restore();
   }
 
   function renderPlacedStickers() {
@@ -666,17 +926,65 @@ PeelIt.Game = (function () {
       if (s === activeDrag) return;
       if (s.state === 'tray' || s.state === 'returning') {
         var locked = s.state === 'tray' && s.z !== activeZ;
+        // A slot chip behind every piece so it is always visible on the white
+        // scrim - a white piece (e.g. the rainbow's star sparkle) used to be
+        // invisible in the tray until you happened to grab it. The grabbable
+        // piece gets a warm accent border to call it out.
+        drawTraySlot(s.trayX, s.trayY, trayCellSize, !locked);
         if (locked) {
           ctx.save();
           ctx.globalAlpha = 0.45;
           ctx.filter = 'grayscale(0.8)';
-          s.draw(ctx);
+          drawTrayPiece(s);
           ctx.restore();
         } else {
-          s.draw(ctx);
+          drawTrayPiece(s);
         }
       }
     });
+  }
+
+  function trayRoundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  // Soft raised "slot" behind a tray piece, so any color reads against the
+  // white scrim. Grabbable slot = brighter fill + gold border; locked = dim.
+  function drawTraySlot(cx, cy, cell, active) {
+    var s = cell * 0.98;
+    var r = s * 0.24;
+    ctx.save();
+    ctx.translate(cx, cy);
+    trayRoundRect(-s / 2, -s / 2, s, s, r);
+    ctx.shadowColor = 'rgba(90, 75, 130, 0.16)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 3;
+    ctx.fillStyle = active ? 'rgba(255, 253, 249, 0.96)' : 'rgba(244, 240, 250, 0.62)';
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(cx, cy);
+    trayRoundRect(-s / 2, -s / 2, s, s, r);
+    ctx.lineWidth = active ? 2.5 : 1.5;
+    ctx.strokeStyle = active ? 'rgba(255, 200, 87, 0.55)' : 'rgba(120, 105, 150, 0.22)';
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawTrayPiece(s) {
+    // Soft drop shadow so even white/light pieces separate from the chip.
+    ctx.save();
+    ctx.shadowColor = 'rgba(70, 55, 100, 0.30)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 2;
+    s.draw(ctx);
+    ctx.restore();
   }
 
   // Shared visual for both the first-level onboarding tutorial (hintActive)
@@ -832,7 +1140,16 @@ PeelIt.Game = (function () {
     };
   }
 
-  return { init: init, _debug: debugState };
+  // Forces a single synchronous update+render outside the rAF loop. Used only
+  // by automated QA to sample the canvas in headless/hidden-tab environments
+  // where requestAnimationFrame is paused by the browser; harmless in
+  // production (nothing calls it).
+  function renderOnce(dt) {
+    update(typeof dt === 'number' ? dt : 0.016);
+    render();
+  }
+
+  return { init: init, _debug: debugState, _renderOnce: renderOnce };
 })();
 
 document.addEventListener('DOMContentLoaded', PeelIt.Game.init);
