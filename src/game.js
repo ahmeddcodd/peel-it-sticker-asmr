@@ -769,6 +769,7 @@ PeelIt.Game = (function () {
   function showFirstHintTip() {
     if (!el.hintTip) return;
     el.hintTip.classList.add('visible');
+    if (el.hintBtn) el.hintBtn.classList.add('hint-tutorial'); // zoom + spotlight the bulb
     positionFirstHintTip();
   }
   function positionFirstHintTip() {
@@ -781,6 +782,7 @@ PeelIt.Game = (function () {
   }
   function hideFirstHintTip() {
     if (el.hintTip) el.hintTip.classList.remove('visible');
+    if (el.hintBtn) el.hintBtn.classList.remove('hint-tutorial');
   }
 
   function onHintBtnClick() {

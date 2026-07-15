@@ -295,6 +295,18 @@ html, body {
 }
 .ad-badge.on-pill { margin-left: 0.4rem; vertical-align: middle; }
 
+/* First-run tutorial: zoom the bulb in with an expanding spotlight ripple so
+   the new player can't miss where hints come from. Overrides the idle pulse. */
+.hint-btn.hint-tutorial {
+  z-index: 7;
+  animation: hint-zoom 1.15s ease-in-out infinite;
+}
+@keyframes hint-zoom {
+  0%   { transform: scale(1.18); box-shadow: 0 0 0 0 rgba(255,190,70,0.6),  0 4px 16px rgba(255,140,60,0.6); }
+  70%  { transform: scale(1.36); box-shadow: 0 0 0 15px rgba(255,190,70,0), 0 7px 24px rgba(255,140,60,0.9); }
+  100% { transform: scale(1.18); box-shadow: 0 0 0 0 rgba(255,190,70,0),    0 4px 16px rgba(255,140,60,0.6); }
+}
+
 /* One-time onboarding coach-mark under the hint button (position set in JS). */
 .hint-tip {
   position: absolute;
