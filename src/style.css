@@ -270,16 +270,61 @@ html, body {
   padding: 0.12rem 0.22rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.25);
 }
-.hint-btn { position: relative; overflow: visible; }
-.hint-btn .hint-glyph { font-size: 1.125rem; }
+/* Colorful, animated, popping hint button so players clearly notice the
+   "get help" action. Gentle continuous pulse + warm glow; always shows the
+   AD badge since every hint is a rewarded ad. */
+.hint-btn {
+  position: relative;
+  overflow: visible;
+  background: linear-gradient(135deg, #ffe06a 0%, #ff9f1c 55%, #ff6f9e 100%);
+  box-shadow: 0 3px 12px rgba(255, 140, 60, 0.5);
+  animation: hint-pulse 1.7s ease-in-out infinite;
+}
+.hint-btn .hint-glyph {
+  font-size: 1.25rem;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,0.18));
+}
+.hint-btn:active { transform: scale(0.92); animation: none; }
+@keyframes hint-pulse {
+  0%, 100% { transform: scale(1);    box-shadow: 0 3px 12px rgba(255,140,60,0.45); }
+  50%      { transform: scale(1.09); box-shadow: 0 5px 18px rgba(255,140,60,0.8); }
+}
 #hint-badge {
   position: absolute;
-  top: -0.28rem; right: -0.28rem;
+  top: -0.3rem; right: -0.3rem;
 }
-/* Free hint available -> no AD badge (its absence signals "free"); once the
-   free hint is spent, the AD badge appears so the ad cost is unmistakable. */
-.hint-btn.free #hint-badge { display: none; }
 .ad-badge.on-pill { margin-left: 0.4rem; vertical-align: middle; }
+
+/* One-time onboarding coach-mark under the hint button (position set in JS). */
+.hint-tip {
+  position: absolute;
+  z-index: 6;
+  display: none;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #ff9f1c, #ff6f9e);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 0.4rem 0.7rem;
+  border-radius: 0.9rem;
+  white-space: nowrap;
+  box-shadow: 0 5px 16px rgba(255, 120, 90, 0.5);
+  pointer-events: none;
+}
+.hint-tip.visible { display: block; animation: hint-tip-bob 1.3s ease-in-out infinite; }
+.hint-tip::before {
+  content: "";
+  position: absolute;
+  top: -6px; left: 50%;
+  margin-left: -6px;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid #ff9f1c;
+}
+@keyframes hint-tip-bob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50%      { transform: translateX(-50%) translateY(-4px); }
+}
 
 /* ---- header row (title + album / back chip) ---------------------------- */
 .select-head {

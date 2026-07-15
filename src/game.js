@@ -81,6 +81,7 @@ PeelIt.Game = (function () {
     el.backBtn = document.getElementById('back-btn');
     el.hintBtn = document.getElementById('hint-btn');
     el.hintBadge = document.getElementById('hint-badge');
+    el.hintTip = document.getElementById('hint-tip');
     el.foilLabel = document.getElementById('foil-label');
     el.foilBadge = document.getElementById('foil-badge');
     el.refThumb = document.getElementById('ref-thumb');
@@ -232,6 +233,7 @@ PeelIt.Game = (function () {
     canvas.style.width = cssW + 'px';
     canvas.style.height = cssH + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    positionFirstHintTip(); // keep the coach-mark aligned to the button
   }
 
   function toDesignCoords(clientX, clientY) {
@@ -248,6 +250,7 @@ PeelIt.Game = (function () {
     // (On level completion, triggerLevelComplete already sent this.)
     if (gameState === 'playing') PeelIt.SDK.gameplayStopped();
     gameState = 'select';
+    hideFirstHintTip();
     el.selectScreen.classList.add('visible');
     el.completeScreen.classList.remove('visible');
     el.albumScreen.classList.remove('visible');
@@ -365,8 +368,9 @@ PeelIt.Game = (function () {
 
     hintActive = (index === 0 && !PeelIt.Save.get().seenHint);
     adHintActive = false;
-    freeHintUsed = false;
-    updateHintBtn();
+    // On the very first onboarding hint, point the player at the hint button
+    // with a small "Need a hint? Tap here" label so they learn what it does.
+    if (hintActive) showFirstHintTip(); else hideFirstHintTip();
 
     gameState = 'playing';
     el.selectScreen.classList.remove('visible');
@@ -459,6 +463,7 @@ PeelIt.Game = (function () {
       if (hintActive) {
         hintActive = false;
         PeelIt.Save.markHintSeen();
+        hideFirstHintTip();
       }
       // Only one sticker is ever grabbable at a time (the z-gated check
       // above), so grabbing anything here IS grabbing the hinted sticker.
@@ -751,30 +756,40 @@ PeelIt.Game = (function () {
   // glow ring on the correct tray piece, pulsing destination outline, and
   // a looping ghost-hand demo. Dismissed the same way the tutorial is:
   // the moment the player actually grabs that sticker (see onPointerDown).
-  // One free hint per level; every hint after that is an OPT-IN rewarded ad
-  // with a clear confirm dialog first. This is the fix for the review's
-  // "hint button requires a reward, which is not obvious to players" - now
-  // the button carries an "AD" badge the moment it costs an ad, and never
-  // plays an ad without the player agreeing to it in the dialog.
-  var freeHintUsed = false;
-
-  function updateHintBtn() {
-    // Free hint available -> hide the AD badge; otherwise show it so the ad
-    // cost is unmistakable before the player taps.
-    if (freeHintUsed) el.hintBtn.classList.remove('free');
-    else el.hintBtn.classList.add('free');
+  //
+  // EVERY hint is an OPT-IN rewarded ad: tapping the button asks first, then
+  // plays the ad, and only reveals the hint once the ad completes (the reward
+  // is granted on the 'rewarded' state - see sdk.js). The AD badge on the
+  // button makes the cost unmistakable up front, satisfying the review's
+  // "hint requires a reward, which is not obvious to players" note.
+  // One-time coach-mark under the hint button, so a new player learns the
+  // button gives hints. Positioned against the button's real on-screen box so
+  // it stays aligned across layouts/orientations. Retired the moment the
+  // player uses the button, finishes the first placement, or leaves the level.
+  function showFirstHintTip() {
+    if (!el.hintTip) return;
+    el.hintTip.classList.add('visible');
+    positionFirstHintTip();
+  }
+  function positionFirstHintTip() {
+    if (!el.hintTip || !el.hintTip.classList.contains('visible') || !el.hintBtn || !frame) return;
+    var hb = el.hintBtn.getBoundingClientRect();
+    var fr = frame.getBoundingClientRect();
+    if (!hb.width || !fr.width) return; // no layout yet
+    el.hintTip.style.left = (hb.left - fr.left + hb.width / 2) + 'px';
+    el.hintTip.style.top = (hb.bottom - fr.top + 10) + 'px';
+  }
+  function hideFirstHintTip() {
+    if (el.hintTip) el.hintTip.classList.remove('visible');
   }
 
   function onHintBtnClick() {
     if (gameState !== 'playing' || adHintActive || el.hintBtn.disabled) return;
-    if (!freeHintUsed) {
-      freeHintUsed = true;
-      updateHintBtn();
-      adHintActive = true; // reveal the hint immediately, no ad
-      return;
-    }
+    hideFirstHintTip(); // player found the button - retire the onboarding label
     showConfirm('Watch a short ad to reveal the next piece?', function () {
       el.hintBtn.disabled = true;
+      // Ad first, hint after: adHintActive is only set in the reward callback,
+      // which fires on the 'rewarded' state (i.e. AFTER the ad is watched).
       PeelIt.SDK.showRewardedAd(PeelIt.SDK.PLACEMENTS.hint, function () {
         adHintActive = true;
         el.hintBtn.disabled = false;

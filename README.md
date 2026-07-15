@@ -35,14 +35,18 @@ an iframe, hashed assets get long-cache headers, and `index.html` is never cache
 
 ## Playgama submission
 
-`public/playgama-bridge-config.json` (copied to the deploy root by Vite) declares the two ad
-placements referenced in [src/sdk.js](src/sdk.js):
+The Bridge SDK is loaded from `https://bridge.playgama.com/v2/stable/playgama-bridge.js`
+(v2 — the current stable line). `public/playgama-bridge-config.json` (copied to the deploy root
+by Vite) declares the three ad placements referenced in [src/sdk.js](src/sdk.js):
 
+- `rewarded_hint` — watch an ad to reveal where the next piece goes
 - `rewarded_foil_pack` — watch an ad to unlock a permanent holographic **foil** finish on a level
 - `interstitial_level_transition` — shown at a natural break every 3rd level completion
 
-Ads are clearly labelled (an **AD** badge, and an opt-in confirm dialog before any rewarded ad —
-the first hint each level is free). Validate the config against the
+Every rewarded ad is opt-in: the control carries an **AD** badge and a confirm dialog states the
+ad will play and names the reward. The ad plays first; the reward is granted only on the bridge's
+`rewarded` state (never when the ad is closed early). Sound and gameplay are paused for every
+full-screen ad. Validate the config against the
 [bridge config editor](https://playgama.github.io/bridge-config-editor/) before submitting, and
 keep the placement id strings in sync between that file and the constants in `src/sdk.js`.
 
