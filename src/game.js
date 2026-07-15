@@ -368,9 +368,6 @@ PeelIt.Game = (function () {
 
     hintActive = (index === 0 && !PeelIt.Save.get().seenHint);
     adHintActive = false;
-    // On the very first onboarding hint, point the player at the hint button
-    // with a small "Need a hint? Tap here" label so they learn what it does.
-    if (hintActive) showFirstHintTip(); else hideFirstHintTip();
 
     gameState = 'playing';
     el.selectScreen.classList.remove('visible');
@@ -378,6 +375,11 @@ PeelIt.Game = (function () {
     el.topBar.classList.add('visible');
     el.levelName.textContent = currentLevel.name;
     updateRefThumb();
+
+    // Show the first-run bulb tutorial AFTER the top bar is visible, so the
+    // hint button has a real layout box to anchor the "Tap here for a hint!"
+    // label against (doing it earlier left the label unpositioned/clipped).
+    if (hintActive) showFirstHintTip(); else hideFirstHintTip();
 
     PeelIt.SDK.levelStarted(currentLevel.id);
     PeelIt.SDK.gameplayStarted(); // active play begins (Poki/CrazyGames need this)
@@ -776,9 +778,11 @@ PeelIt.Game = (function () {
     if (!el.hintTip || !el.hintTip.classList.contains('visible') || !el.hintBtn || !frame) return;
     var hb = el.hintBtn.getBoundingClientRect();
     var fr = frame.getBoundingClientRect();
-    if (!hb.width || !fr.width) return; // no layout yet
+    // If the button isn't laid out yet (e.g. the top bar just became visible),
+    // retry next frame - keeps retrying only while the tip is still showing.
+    if (!hb.width || !fr.width) { requestAnimationFrame(positionFirstHintTip); return; }
     el.hintTip.style.left = (hb.left - fr.left + hb.width / 2) + 'px';
-    el.hintTip.style.top = (hb.bottom - fr.top + 10) + 'px';
+    el.hintTip.style.top = (hb.bottom - fr.top + 12) + 'px';
   }
   function hideFirstHintTip() {
     if (el.hintTip) el.hintTip.classList.remove('visible');
