@@ -4,7 +4,7 @@ window.PeelIt = window.PeelIt || {};
  * levels.js - pure data. No logic lives here.
  *
  * Level format:
- *   id     - unique string, used as the save-data key for stars/foil
+ *   id     - unique string, used as the save-data key for stars
  *   name   - sentence-case display name
  *   bg     - { top, bottom, accent } hex colors for the scene background
  *   stickers - array of sticker definitions, each:

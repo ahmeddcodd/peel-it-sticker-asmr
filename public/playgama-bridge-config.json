@@ -9,7 +9,6 @@
     "rewarded": {
       "preloadOnStart": true,
       "placements": [
-        { "id": "rewarded_foil_pack" },
         { "id": "rewarded_hint" }
       ]
     }

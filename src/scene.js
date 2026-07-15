@@ -56,7 +56,6 @@ PeelIt.SceneRender = (function () {
   //   opts.background : paint the level's gradient behind the art (thumbnails)
   //   opts.alpha      : global alpha for the art (ghost reference uses ~0.12)
   //   opts.radius     : round the background corners by this many px
-  //   opts.foil       : overlay a holographic sheen (album foil variant)
   function drawSolved(ctx, level, w, h, opts) {
     opts = opts || {};
     var items = solvedItems(level);
@@ -103,21 +102,6 @@ PeelIt.SceneRender = (function () {
     });
 
     ctx.restore();
-
-    if (opts.foil) {
-      ctx.save();
-      if (opts.radius) { roundRect(ctx, 0, 0, w, h, opts.radius); ctx.clip(); }
-      ctx.globalCompositeOperation = 'overlay';
-      var fg = ctx.createLinearGradient(0, 0, w, h);
-      fg.addColorStop(0.0, 'rgba(255,209,255,0.0)');
-      fg.addColorStop(0.35, 'rgba(201,231,255,0.5)');
-      fg.addColorStop(0.5, 'rgba(255,233,168,0.55)');
-      fg.addColorStop(0.65, 'rgba(201,231,255,0.5)');
-      fg.addColorStop(1.0, 'rgba(255,209,255,0.0)');
-      ctx.fillStyle = fg;
-      ctx.fillRect(0, 0, w, h);
-      ctx.restore();
-    }
   }
 
   function roundRect(ctx, x, y, w, h, r) {

@@ -244,12 +244,7 @@ PeelIt.SDK = (function () {
   //     (assumed below; guarded with a feature check either way).
   //
   // Must match the placement ids declared in playgama-bridge-config.json.
-  // Each rewarded PLACEMENT is distinct so the two very different rewards
-  // (cosmetic foil pack vs. a placement hint) are attributed separately -
-  // previously both fired under 'rewarded_foil_pack', which mis-reported every
-  // hint impression as a foil-pack one.
   var PLACEMENTS = {
-    foil: 'rewarded_foil_pack',
     hint: 'rewarded_hint'
   };
   var INTERSTITIAL_PLACEMENT = 'interstitial_level_transition';
@@ -587,8 +582,7 @@ PeelIt.SDK = (function () {
     gameplayStopped: function () { active.gameplayStopped(); },
     levelStarted: function (levelId) { active.levelStarted(levelId); },
     levelComplete: function (levelId) { active.levelComplete(levelId); },
-    // placement is one of PeelIt.SDK.PLACEMENTS (foil / hint) so the two
-    // rewarded rewards are reported separately.
+    // placement is one of PeelIt.SDK.PLACEMENTS (currently just `hint`).
     showRewardedAd: function (placement, onReward, onFail) { active.showRewardedAd(placement, onReward, onFail); },
     showInterstitialAd: function (onClosed) { active.showInterstitialAd(onClosed); },
     getLanguage: function () { return active.getLanguage(); },

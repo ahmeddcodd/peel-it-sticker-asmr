@@ -9,8 +9,7 @@ window.PeelIt = window.PeelIt || {};
  *                               the origin, assuming a bounding box of
  *                               roughly `size` x `size` design pixels.
  *   outline(ctx, size)       - traces a silhouette path (no fill/stroke)
- *                               used for the dashed target preview and for
- *                               clipping the foil-pack shimmer sweep.
+ *                               used for the dashed target preview.
  */
 PeelIt.Sticker = (function () {
   'use strict';
@@ -1548,7 +1547,6 @@ PeelIt.Sticker = (function () {
     this.returnT = 0;        // 0-1 progress through the return-to-tray tween
     this.returnFrom = { x: 0, y: 0 };
     this.shakeT = 0;         // >0 while playing the "wrong" shake
-    this.foil = false;
     this.dropDistance = null; // px distance from target at time of placement
 
     // Smoothed drag velocity, used so the peel corner curls away from the
@@ -1686,9 +1684,8 @@ PeelIt.Sticker = (function () {
     this.shakeT = wrong ? 0.35 : 0;
   };
 
-  // Perf: once a sticker is placed (and not foil-shimmering, which needs a
-  // live animated sweep), it never changes appearance again but was still
-  // rebuilding its full vector path + gradients from scratch every single
+  // Perf: once a sticker is placed it never changes appearance again but was
+  // still rebuilding its full vector path + gradients from scratch every single
   // frame for the rest of the level, forever. Bake it to an offscreen
   // bitmap once and blit that instead - a plain drawImage is far cheaper
   // than reconstructing paths/gradients 60 times a second, and this is
@@ -1729,9 +1726,9 @@ PeelIt.Sticker = (function () {
     var shape = SHAPES[this.shape];
     if (!shape) return;
 
-    // Fast path: a settled, non-foil sticker is static - blit the cached
-    // bitmap instead of redrawing the live vector art (see buildCache above).
-    if (this.state === 'placed' && !this.foil) {
+    // Fast path: a settled sticker is static - blit the cached bitmap instead
+    // of redrawing the live vector art (see buildCache above).
+    if (this.state === 'placed') {
       if (!this.cachedCanvas) this.buildCache();
       ctx.save();
       ctx.translate(this.x, this.y);
@@ -1758,22 +1755,6 @@ PeelIt.Sticker = (function () {
     }
 
     shape.draw(ctx, this.size, this.color);
-
-    // foil-pack cosmetic: diagonal shimmer sweep clipped to the silhouette
-    if (this.foil) {
-      ctx.save();
-      shape.outline(ctx, this.size);
-      ctx.clip();
-      var sweep = (Math.sin(performance.now() / 900 + this.wobblePhase) + 1) / 2;
-      var gx = -this.size + sweep * this.size * 2;
-      var grad = ctx.createLinearGradient(gx - 40, -this.size, gx + 40, this.size);
-      grad.addColorStop(0, 'rgba(255,255,255,0)');
-      grad.addColorStop(0.5, 'rgba(255,255,255,0.55)');
-      grad.addColorStop(1, 'rgba(255,255,255,0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(-this.size, -this.size, this.size * 2, this.size * 2);
-      ctx.restore();
-    }
 
     // Peel fold highlight: a curling flap at the sticker's trailing edge
     // (opposite the drag direction, tracked via foldAngle in dragTo) that

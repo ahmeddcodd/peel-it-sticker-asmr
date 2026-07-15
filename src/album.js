@@ -6,7 +6,7 @@ window.PeelIt = window.PeelIt || {};
  * Every completed level's finished picture is collected as a card in an album,
  * mirroring the real-world sticker-book fantasy the game is themed around. It
  * renders each collected sticker's solved artwork to a small canvas thumbnail,
- * marks 3-star / foil (holographic) status, and shows overall completion.
+ * marks 3-star status, and shows overall completion.
  *
  * Wired up in game.js (album button on the level-select screen). Kept as its
  * own module so the meta layer is separable from the core play loop.
@@ -25,7 +25,7 @@ PeelIt.Album = (function () {
   // Renders a level's fully-assembled picture into a small square canvas,
   // reusing the exact shape draw() calls the live game uses so the album
   // thumbnail is a faithful miniature of what the player built.
-  function renderThumb(canvas, level, foil) {
+  function renderThumb(canvas, level) {
     var ctx = canvas.getContext('2d');
     var dpr = window.devicePixelRatio || 1;
     var CSS = 132;
@@ -34,7 +34,7 @@ PeelIt.Album = (function () {
     canvas.style.width = CSS + 'px';
     canvas.style.height = CSS + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    PeelIt.SceneRender.drawSolved(ctx, level, CSS, CSS, { foil: foil, background: true });
+    PeelIt.SceneRender.drawSolved(ctx, level, CSS, CSS, { background: true });
   }
 
   function build() {
@@ -55,7 +55,7 @@ PeelIt.Album = (function () {
         var thumb = document.createElement('canvas');
         thumb.className = 'album-thumb';
         card.appendChild(thumb);
-        renderThumb(thumb, lvl, PeelIt.Save.hasFoil(lvl.id));
+        renderThumb(thumb, lvl);
 
         var name = document.createElement('div');
         name.className = 'album-name';
@@ -71,8 +71,6 @@ PeelIt.Album = (function () {
           starsRow.appendChild(st);
         }
         card.appendChild(starsRow);
-
-        if (PeelIt.Save.hasFoil(lvl.id)) card.classList.add('foil');
       } else {
         var q = document.createElement('div');
         q.className = 'album-locked';

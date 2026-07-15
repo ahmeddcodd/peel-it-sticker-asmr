@@ -37,10 +37,9 @@ an iframe, hashed assets get long-cache headers, and `index.html` is never cache
 
 The Bridge SDK is loaded from `https://bridge.playgama.com/v2/stable/playgama-bridge.js`
 (v2 — the current stable line). `public/playgama-bridge-config.json` (copied to the deploy root
-by Vite) declares the three ad placements referenced in [src/sdk.js](src/sdk.js):
+by Vite) declares the two ad placements referenced in [src/sdk.js](src/sdk.js):
 
 - `rewarded_hint` — watch an ad to reveal where the next piece goes
-- `rewarded_foil_pack` — watch an ad to unlock a permanent holographic **foil** finish on a level
 - `interstitial_level_transition` — shown at a natural break every 3rd level completion
 
 Every rewarded ad is opt-in: the control carries an **AD** badge and a confirm dialog states the
@@ -63,7 +62,7 @@ src/sdk.js                     platform abstraction (Playgama / YouTube / Poki /
 src/save.js                    progress persistence, built on the SDK
 src/audio.js                   procedural Web Audio: ambient music bed + peel/place SFX
 src/particles.js               pooled confetti + sparkle systems
-src/sticker.js                 vector shape registry + the Sticker entity (peel/settle/foil)
+src/sticker.js                 vector shape registry + the Sticker entity (peel/settle)
 src/scene.js                   renders a level's finished picture (ghost ref / thumbnails)
 src/levels.js                  pure data: 12 levels
 src/album.js                   sticker-album meta screen

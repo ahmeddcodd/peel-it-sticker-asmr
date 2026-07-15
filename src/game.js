@@ -75,15 +75,12 @@ PeelIt.Game = (function () {
     el.nextBtn = document.getElementById('next-btn');
     el.replayBtn = document.getElementById('replay-btn');
     el.menuBtn = document.getElementById('menu-btn');
-    el.foilBtn = document.getElementById('foil-btn');
     el.topBar = document.getElementById('top-bar');
     el.levelName = document.getElementById('level-name');
     el.backBtn = document.getElementById('back-btn');
     el.hintBtn = document.getElementById('hint-btn');
     el.hintBadge = document.getElementById('hint-badge');
     el.hintTip = document.getElementById('hint-tip');
-    el.foilLabel = document.getElementById('foil-label');
-    el.foilBadge = document.getElementById('foil-badge');
     el.refThumb = document.getElementById('ref-thumb');
     el.albumBtn = document.getElementById('album-btn');
     el.albumScreen = document.getElementById('screen-album');
@@ -177,7 +174,6 @@ PeelIt.Game = (function () {
         }
       });
     });
-    el.foilBtn.addEventListener('click', onFoilBtnClick);
     el.hintBtn.addEventListener('click', onHintBtnClick);
     el.albumBtn.addEventListener('click', showAlbum);
     el.albumBackBtn.addEventListener('click', showLevelSelect);
@@ -288,7 +284,7 @@ PeelIt.Game = (function () {
         var thumbC = document.createElement('canvas');
         thumbC.className = 'level-thumb';
         card.appendChild(thumbC);
-        renderThumbCanvas(thumbC, lvl, 240, 22, PeelIt.Save.hasFoil(lvl.id));
+        renderThumbCanvas(thumbC, lvl, 240, 22);
       }
 
       var label = document.createElement('div');
@@ -312,20 +308,18 @@ PeelIt.Game = (function () {
   // Render a level's finished picture into a square canvas (menu cards + the
   // top-bar reference). Uses the shared solved-picture renderer so every
   // thumbnail is a faithful miniature of the assembled art.
-  function renderThumbCanvas(canvas, level, px, radius, foil) {
+  function renderThumbCanvas(canvas, level, px, radius) {
     var d = window.devicePixelRatio || 1;
     canvas.width = px * d;
     canvas.height = px * d;
     var c = canvas.getContext('2d');
     c.setTransform(d, 0, 0, d, 0, 0);
-    PeelIt.SceneRender.drawSolved(c, level, px, px, {
-      background: true, radius: radius, foil: !!foil
-    });
+    PeelIt.SceneRender.drawSolved(c, level, px, px, { background: true, radius: radius });
   }
 
   function updateRefThumb() {
     if (!el.refThumb || !currentLevel) return;
-    renderThumbCanvas(el.refThumb, currentLevel, 132, 16, PeelIt.Save.hasFoil(currentLevel.id));
+    renderThumbCanvas(el.refThumb, currentLevel, 132, 16);
   }
 
   function makeStarSpan(filled) {
@@ -358,7 +352,6 @@ PeelIt.Game = (function () {
       var s = new PeelIt.Sticker.Sticker(def, currentLevel.id);
       s.targetX = SCENE_RECT.x + def.tx * SCENE_RECT.w;
       s.targetY = SCENE_RECT.y + def.ty * SCENE_RECT.h;
-      s.foil = PeelIt.Save.hasFoil(currentLevel.id);
       return s;
     }).sort(function (a, b) { return a.z - b.z; });
 
@@ -694,7 +687,6 @@ PeelIt.Game = (function () {
     }
     var isLast = currentLevelIndex + 1 >= PeelIt.Levels.count();
     el.nextBtn.textContent = isLast ? 'See levels' : 'Next →';
-    updateFoilBtn();
     el.completeScreen.classList.add('visible');
 
     // Pop the earned stars in one at a time with an ascending chime - a small
@@ -707,49 +699,6 @@ PeelIt.Game = (function () {
         }, 260 + idx * 280);
       })(j);
     }
-  }
-
-  function updateFoilBtn() {
-    if (PeelIt.Save.hasFoil(currentLevel.id)) {
-      el.foilLabel.textContent = '✨ Foil pack unlocked';
-      el.foilBadge.style.display = 'none'; // no longer an ad cost
-      el.foilBtn.classList.add('unlocked');
-      el.foilBtn.disabled = true;
-    } else {
-      el.foilLabel.textContent = '✨ Unlock foil pack';
-      el.foilBadge.style.display = '';
-      el.foilBtn.classList.remove('unlocked');
-      el.foilBtn.disabled = false;
-    }
-  }
-
-  // Rewarded-ad cosmetic: watching an ad unlocks a permanent metallic
-  // shimmer sweep (see Sticker.prototype.draw's `if (this.foil)` branch)
-  // on every sticker in this level, retroactively applied to the already-
-  // placed stickers so the payoff is visible immediately.
-  function onFoilBtnClick() {
-    if (PeelIt.Save.hasFoil(currentLevel.id) || el.foilBtn.disabled) return;
-    // Playgama requires the call-to-action to state plainly that an ad will
-    // play AND name the reward before the ad starts - the AD badge plus this
-    // explicit opt-in dialog cover both.
-    showConfirm('Watch a short ad to unlock the foil pack?', function () {
-      el.foilBtn.disabled = true;
-      PeelIt.SDK.showRewardedAd(PeelIt.SDK.PLACEMENTS.foil, function () {
-        PeelIt.Save.setFoil(currentLevel.id);
-        stickers.forEach(function (s) { s.foil = true; });
-        PeelIt.Audio.playChime(4);
-        for (var i = 0; i < 8; i++) {
-          PeelIt.Particles.sparkle(
-            SCENE_RECT.x + Math.random() * SCENE_RECT.w,
-            SCENE_RECT.y + Math.random() * SCENE_RECT.h,
-            '#FFD700'
-          );
-        }
-        updateFoilBtn();
-      }, function () {
-        el.foilBtn.disabled = false;
-      });
-    });
   }
 
   // Player-requested hint: watching a rewarded ad reveals which tray
@@ -1196,7 +1145,7 @@ PeelIt.Game = (function () {
       trayCellSize: trayCellSize,
       stickers: stickers.map(function (s) {
         return {
-          id: s.id, z: s.z, state: s.state, foil: s.foil,
+          id: s.id, z: s.z, state: s.state,
           size: s.size, trayScale: s.trayScale, grabRadius: trayGrabRadius(s),
           trayX: s.trayX, trayY: s.trayY, targetX: s.targetX, targetY: s.targetY
         };

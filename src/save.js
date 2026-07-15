@@ -10,7 +10,6 @@ PeelIt.Save = (function () {
   var DEFAULT_STATE = {
     unlockedIndex: 0,   // highest level index (0-based) the player may play
     stars: {},          // { levelId: 1-3 }
-    foil: {},           // { levelId: true } cosmetic unlock via rewarded ad
     muted: false,
     seenHint: false      // whether the onboarding hand hint has been consumed
   };
@@ -24,14 +23,12 @@ PeelIt.Save = (function () {
   function applyDefaults() {
     state = Object.assign({}, DEFAULT_STATE);
     state.stars = Object.assign({}, DEFAULT_STATE.stars);
-    state.foil = Object.assign({}, DEFAULT_STATE.foil);
   }
 
   function applyLoaded(loaded) {
     state = Object.assign({}, DEFAULT_STATE, loaded || {});
     // Merge nested dicts explicitly so a partial/old save can't wipe fields.
     state.stars = Object.assign({}, DEFAULT_STATE.stars, (loaded && loaded.stars) || {});
-    state.foil = Object.assign({}, DEFAULT_STATE.foil, (loaded && loaded.foil) || {});
   }
 
   // Callback-based because some platform SDKs (e.g. Playgama) load saved
@@ -44,8 +41,8 @@ PeelIt.Save = (function () {
       // Write straight back once on every CONFIRMED load (even a brand-new
       // player with nothing to save yet) so a shallow playthrough still
       // produces at least one storage.set call - without this, persist()
-      // only ever runs after a level completion / mute toggle / foil
-      // unlock, which some moderation checks read as "save not integrated"
+      // only ever runs after a level completion / mute toggle, which some
+      // moderation checks read as "save not integrated"
       // even though it is.
       //
       // Critically, this is skipped when timedOut is true. A timeout means
@@ -114,17 +111,6 @@ PeelIt.Save = (function () {
     }
   }
 
-  function setFoil(levelId) {
-    get();
-    state.foil[levelId] = true;
-    persist();
-  }
-
-  function hasFoil(levelId) {
-    get();
-    return !!state.foil[levelId];
-  }
-
   function toggleMute() {
     get();
     state.muted = !state.muted;
@@ -145,8 +131,6 @@ PeelIt.Save = (function () {
     get: get,
     setStars: setStars,
     unlockNext: unlockNext,
-    setFoil: setFoil,
-    hasFoil: hasFoil,
     toggleMute: toggleMute,
     markHintSeen: markHintSeen,
     applyLateData: applyLateData
